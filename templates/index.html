@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart ANPR Gate System</title>
+</head>
+<body>
+
+    <h1>🚗 Smart Gate ANPR System</h1>
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" required>
+        <button type="submit">Scan Vehicle</button>
+    </form>
+
+    {% if image_path %}
+        <h3>Uploaded Image:</h3>
+        <img src="{{ image_path }}" width="400">
+    {% endif %}
+
+    {% if plate_number %}
+        <h2>Detected Plate:</h2>
+        <h1>{{ plate_number }}</h1>
+    {% endif %}
+
+    {% if access_status %}
+        <h2>Access Status:</h2>
+
+        {% if access_status == "GRANTED" %}
+            <h1 style="color: green;">✅ ACCESS GRANTED</h1>
+        {% elif access_status == "DENIED" %}
+            <h1 style="color: red;">❌ ACCESS DENIED</h1>
+        {% else %}
+            <h1 style="color: orange;">⚠ UNKNOWN VEHICLE</h1>
+        {% endif %}
+    {% endif %}
+
+</body>
+</html>
