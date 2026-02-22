@@ -1,135 +1,177 @@
-from flask import Flask, render_template, request
+import os
+import csv
 import cv2
 import easyocr
-import os
-import re
-import csv
 from datetime import datetime
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "static/uploads"
-LOG_FILE = "vehicle_log.csv"
-WHITELIST_FILE = "whitelist.csv"
-BLACKLIST_FILE = "blacklist.csv"
+UPLOAD_FOLDER = "uploads"
+LOG_FILE = "vehicle_logs.csv"
+WHITELIST_FILE = "whitelist.txt"
+BLACKLIST_FILE = "blacklist.txt"
 
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Initialize OCR reader
 reader = easyocr.Reader(['en'])
 
-# -----------------------------
-# CLEAN OCR TEXT
-# -----------------------------
-def clean_text(text):
-    text = text.upper()
-    text = text.replace(" ", "")
-    text = text.replace("-", "")
-    text = text.replace("O", "0")
-    text = text.replace("I", "1")
-    return text
+# ---------------------------------------------------
+# Load Whitelist
+# ---------------------------------------------------
+def load_whitelist():
+    if not os.path.exists(WHITELIST_FILE):
+        return []
+    with open(WHITELIST_FILE, "r") as f:
+        return [line.strip().upper() for line in f.readlines()]
 
-# -----------------------------
-# EXTRACT PLATE NUMBER
-# -----------------------------
-def extract_plate(text_list):
-    combined_text = "".join(text_list)
-    combined_text = clean_text(combined_text)
+# ---------------------------------------------------
+# Load Blacklist
+# ---------------------------------------------------
+def load_blacklist():
+    if not os.path.exists(BLACKLIST_FILE):
+        return []
+    with open(BLACKLIST_FILE, "r") as f:
+        return [line.strip().upper() for line in f.readlines()]
 
-    plate_pattern = r'[0-9]{2}[A-Z]{1,3}[0-9]{4}'
-    match = re.search(plate_pattern, combined_text)
-
-    if match:
-        return match.group()
-    else:
-        return "No Valid Plate Found"
-
-# -----------------------------
-# READ CSV FILE SAFELY
-# -----------------------------
-def read_plate_list(filename):
-    plates = []
-
-    if os.path.exists(filename):
-        with open(filename, mode='r') as file:
-            reader_csv = csv.reader(file)
-            next(reader_csv, None)  # skip header
-
-            for row in reader_csv:
-                if row:
-                    plate = row[0].strip().upper()
-                    plates.append(plate)
-
-    return plates
-
-# -----------------------------
-# CHECK ACCESS STATUS
-# -----------------------------
-def check_access(plate):
-    whitelist = read_plate_list(WHITELIST_FILE)
-    blacklist = read_plate_list(BLACKLIST_FILE)
-
-    if plate in blacklist:
-        return "DENIED"
-    elif plate in whitelist:
-        return "GRANTED"
-    else:
-        return "UNKNOWN"
-
-# -----------------------------
-# SAVE VEHICLE LOG
-# -----------------------------
-def save_log(plate, image_name, status):
+# ---------------------------------------------------
+# Save Log
+# ---------------------------------------------------
+def save_log(plate, status, image_name):
     file_exists = os.path.isfile(LOG_FILE)
 
     with open(LOG_FILE, mode='a', newline='') as file:
         writer = csv.writer(file)
 
         if not file_exists:
-            writer.writerow(["Plate Number", "Date", "Time", "Image", "Status"])
+            writer.writerow(["Plate Number", "Date", "Time", "Status", "Image"])
 
         now = datetime.now()
-        date = now.strftime("%d-%m-%Y")
-        time = now.strftime("%H:%M:%S")
+        writer.writerow([
+            plate,
+            now.strftime("%d-%m-%Y"),
+            now.strftime("%H:%M:%S"),
+            status,
+            image_name
+        ])
 
-        writer.writerow([plate, date, time, image_name, status])
+# ---------------------------------------------------
+# Plate Detection Function
+# ---------------------------------------------------
+def detect_plate(image_path):
+    try:
+        img = cv2.imread(image_path)
 
-# -----------------------------
-# MAIN ROUTE
-# -----------------------------
-@app.route("/", methods=["GET", "POST"])
+        if img is None:
+            return "NO IMAGE"
+
+        # Image Preprocessing (Improves ESP32 Accuracy)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = cv2.bilateralFilter(gray, 11, 17, 17)
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+
+        results = reader.readtext(thresh)
+
+        for (bbox, text, prob) in results:
+            plate = text.strip().upper().replace(" ", "")
+            if len(plate) >= 6:
+                return plate
+
+        return "NO PLATE FOUND"
+
+    except Exception as e:
+        print("Detection Error:", e)
+        return "PROCESSING ERROR"
+
+# ---------------------------------------------------
+# Home Page
+# ---------------------------------------------------
+@app.route("/")
 def index():
-    plate_number = ""
-    image_path = ""
-    access_status = ""
+    return render_template("index.html")
 
-    if request.method == "POST":
-        if "image" not in request.files:
-            return render_template("index.html")
+# ---------------------------------------------------
+# Browser Upload Route
+# ---------------------------------------------------
+@app.route("/upload", methods=["POST"])
+def upload():
+    if "image" not in request.files:
+        return render_template("result.html",
+                               plate="NO IMAGE",
+                               status="ERROR")
 
-        file = request.files["image"]
+    image = request.files["image"]
+    filepath = os.path.join(UPLOAD_FOLDER, image.filename)
+    image.save(filepath)
 
-        if file.filename != "":
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-            file.save(filepath)
-            image_path = filepath
+    plate = detect_plate(filepath)
 
-            img = cv2.imread(filepath)
-            result = reader.readtext(img)
+    whitelist = load_whitelist()
+    blacklist = load_blacklist()
 
-            detected_texts = [detection[1] for detection in result]
-            plate_number = extract_plate(detected_texts)
+    if plate in blacklist:
+        status = "BLOCKED"
+    elif plate in whitelist:
+        status = "GRANTED"
+    else:
+        status = "UNKNOWN"
 
-            if plate_number != "No Valid Plate Found":
-                access_status = check_access(plate_number)
-                save_log(plate_number, file.filename, access_status)
+    save_log(plate, status, image.filename)
 
-    return render_template("index.html",
-                           plate_number=plate_number,
-                           image_path=image_path,
-                           access_status=access_status)
+    return render_template("result.html",
+                           plate=plate,
+                           status=status)
 
-# -----------------------------
-# RUN APP
-# -----------------------------
+# ---------------------------------------------------
+# ESP32 Upload API
+# ---------------------------------------------------
+@app.route("/esp32_upload", methods=["POST"])
+def esp32_upload():
+    if "image" not in request.files:
+        return jsonify({"status": "ERROR", "plate": "NO IMAGE"})
+
+    image = request.files["image"]
+    filepath = os.path.join(UPLOAD_FOLDER, image.filename)
+    image.save(filepath)
+
+    plate = detect_plate(filepath)
+
+    whitelist = load_whitelist()
+    blacklist = load_blacklist()
+
+    if plate in blacklist:
+        status = "BLOCKED"
+    elif plate in whitelist:
+        status = "GRANTED"
+    else:
+        status = "UNKNOWN"
+
+    save_log(plate, status, image.filename)
+
+    return jsonify({
+        "status": status,
+        "plate": plate
+    })
+
+# ---------------------------------------------------
+# View Logs
+# ---------------------------------------------------
+@app.route("/logs")
+def view_logs():
+    logs = []
+
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, mode='r') as file:
+            reader_csv = csv.reader(file)
+            next(reader_csv, None)
+            for row in reader_csv:
+                logs.append(row)
+
+    return render_template("logs.html", logs=logs)
+
+# ---------------------------------------------------
+# Run Server
+# ---------------------------------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
