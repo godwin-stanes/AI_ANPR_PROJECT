@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI ANPR Project</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #05080d;
+  --surf:     #090d14;
+  --card:     #0c1220;
+  --card2:    #101828;
+  --border:   #172030;
+  --border2:  #1e2e44;
+  --accent:   #00d4ff;
+  --green:    #00e87a;
+  --red:      #ff2d55;
+  --orange:   #ff8c00;
+  --yellow:   #ffd600;
+  --text:     #b0c8d8;
+  --muted:    #506070;
+  --white:    #e4eff5;
+  --hud:      'Orbitron', monospace;
+  --mono:     'DM Mono', monospace;
+  --ui:       'Barlow', sans-serif;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { height:100%; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:var(--ui); font-size:14px;
+  min-height:100vh; overflow-x:hidden;
+}
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,212,255,.01) 3px,rgba(0,212,255,.01) 4px);
+}
+
+/* ── CORNER MARKS ── */
+.cm { position:fixed; width:36px; height:36px; z-index:998; opacity:.35; }
+.cm::before,.cm::after { content:''; position:absolute; background:var(--accent); }
+.cm::before { width:100%; height:2px; }
+.cm::after  { width:2px; height:100%; }
+.cm.tl{top:10px;left:10px} .cm.tr{top:10px;right:10px;transform:scaleX(-1)}
+.cm.bl{bottom:10px;left:10px;transform:scaleY(-1)} .cm.br{bottom:10px;right:10px;transform:scale(-1,-1)}
+
+/* ══════════════════ HEADER ══════════════════ */
+.hdr {
+  height:56px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px; background:var(--surf); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.hdr::after {
+  content:''; position:absolute; bottom:-1px; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.3;
+}
+.hdr-l { display:flex; align-items:center; gap:14px; }
+.hdr-icon {
+  width:34px; height:34px; border-radius:6px;
+  background:linear-gradient(135deg,#0099cc,#00d4ff);
+  display:flex; align-items:center; justify-content:center; font-size:17px;
+  box-shadow:0 0 18px rgba(0,212,255,.35);
+}
+.hdr-title { font-family:var(--hud); font-size:14px; font-weight:700; letter-spacing:4px; color:var(--white); }
+.hdr-sub   { font-family:var(--mono); font-size:9px; color:var(--accent); letter-spacing:2px; margin-top:2px; }
+.hdr-r { display:flex; align-items:center; gap:16px; }
+.live-badge { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; color:var(--green); letter-spacing:2px; }
+.live-dot   { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1.3s ease-in-out infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.srv-box { display:flex; align-items:center; gap:6px; }
+.srv-box label { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; }
+.srv-box input {
+  background:var(--card); border:1px solid var(--border2); color:var(--accent);
+  font-family:var(--mono); font-size:10px; padding:4px 9px; border-radius:4px; width:200px;
+}
+.srv-box input:focus { outline:none; border-color:var(--accent); }
+.clk { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
+/* ══════════════════ TABS ══════════════════ */
+.tabs {
+  display:flex; border-bottom:1px solid var(--border);
+  background:var(--surf); padding:0 22px;
+}
+.tab {
+  padding:10px 18px; font-family:var(--mono); font-size:10px;
+  letter-spacing:2px; color:var(--muted); cursor:pointer;
+  border-bottom:2px solid transparent; transition:all .2s;
+  text-transform:uppercase; margin-bottom:-1px;
+}
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ══════════════════ STATS BAR ══════════════════ */
+.stats-bar {
+  display:grid; grid-template-columns:repeat(5,1fr);
+  border-bottom:1px solid var(--border);
+}
+.stt {
+  padding:13px 18px; background:var(--surf);
+  border-right:1px solid var(--border); position:relative;
+}
+.stt:last-child{border-right:none}
+.stt::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+.stt.t1::after{background:var(--accent)} .stt.t2::after{background:var(--green)}
+.stt.t3::after{background:var(--red)} .stt.t4::after{background:var(--orange)}
+.stt.t5::after{background:var(--yellow)}
+.stt-l { font-family:var(--mono); font-size:8px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+.stt-v { font-family:var(--hud); font-size:24px; font-weight:700; }
+.stt.t1 .stt-v{color:var(--accent)} .stt.t2 .stt-v{color:var(--green)}
+.stt.t3 .stt-v{color:var(--red)} .stt.t4 .stt-v{color:var(--orange)} .stt.t5 .stt-v{color:var(--yellow)}
+.stt-s { font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ══════════════════ PAGE PANELS ══════════════════ */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── Dashboard layout ── */
+.dash-layout {
+  display:grid; grid-template-columns:1fr 400px;
+  height:calc(100vh - 56px - 41px - 62px);
+  overflow:hidden;
+}
+
+/* LEFT */
+.dash-left { display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
+
+/* Hero card */
+.hero {
+  margin:14px; flex-shrink:0;
+  background:var(--card); border:1px solid var(--border2);
+  border-radius:10px; padding:18px 22px; position:relative; overflow:hidden;
+  transition:all .4s;
+}
+.hero::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; transition:all .5s; }
+.hero.idle::before    { background:var(--border2); }
+.hero.whitelist::before { background:var(--green); box-shadow:0 0 25px var(--green); }
+.hero.blacklist::before { background:var(--red);   box-shadow:0 0 25px var(--red); }
+.hero.unknown::before   { background:var(--orange); box-shadow:0 0 25px var(--orange); }
+.hero.scan::after {
+  content:''; position:absolute; top:0; left:-120%; width:60%; height:100%;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.07),transparent);
+  animation:sweep .7s ease forwards;
+}
+@keyframes sweep { to{left:140%} }
+
+.hero-eye { font-family:var(--mono); font-size:8px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+.hero-plate {
+  font-family:var(--hud); font-size:44px; font-weight:900;
+  letter-spacing:10px; line-height:1; margin-bottom:12px; transition:all .4s;
+}
+.hero.idle      .hero-plate { color:var(--muted); }
+.hero.whitelist .hero-plate { color:var(--green); text-shadow:0 0 35px rgba(0,232,122,.4); }
+.hero.blacklist .hero-plate { color:var(--red);   text-shadow:0 0 35px rgba(255,45,85,.4); }
+.hero.unknown   .hero-plate { color:var(--orange);text-shadow:0 0 35px rgba(255,140,0,.4); }
+.hero-row { display:flex; align-items:center; justify-content:space-between; }
+.hero-badge {
+  display:inline-flex; align-items:center; gap:7px;
+  padding:5px 14px; border-radius:100px;
+  font-family:var(--hud); font-size:10px; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase; transition:all .4s;
+}
+.hero.idle      .hero-badge { background:rgba(30,46,68,.5); color:var(--muted); border:1px solid var(--border2); }
+.hero.whitelist .hero-badge { background:rgba(0,232,122,.1); color:var(--green); border:1px solid rgba(0,232,122,.3); }
+.hero.blacklist .hero-badge { background:rgba(255,45,85,.1); color:var(--red);   border:1px solid rgba(255,45,85,.3); }
+.hero.unknown   .hero-badge { background:rgba(255,140,0,.1); color:var(--orange);border:1px solid rgba(255,140,0,.3); }
+.hero-meta { font-family:var(--mono); font-size:9px; color:var(--muted); text-align:right; line-height:1.9; }
+
+/* Activity bars */
+.mini-section { padding:10px 14px 0; flex-shrink:0; }
+.sec-label {
+  font-family:var(--mono); font-size:8px; letter-spacing:2px;
+  color:var(--muted); text-transform:uppercase; margin-bottom:6px;
+  display:flex; align-items:center; gap:8px;
+}
+.sec-label::after { content:''; flex:1; height:1px; background:var(--border); }
+.activity { display:flex; align-items:flex-end; gap:3px; height:40px; }
+.ab { flex:1; border-radius:2px 2px 0 0; min-width:5px; cursor:default; transition:opacity .2s; }
+.ab:hover { opacity:.7; }
+.ab.w { background:rgba(0,232,122,.5); }
+.ab.b { background:rgba(255,45,85,.5); }
+.ab.u { background:rgba(255,140,0,.4); }
+.ab.e { background:var(--border); }
+
+/* Log table */
+.log-wrap { flex:1; overflow-y:auto; padding:10px 14px; }
+.log-table { width:100%; border-collapse:collapse; }
+.log-table th {
+  font-family:var(--mono); font-size:8px; letter-spacing:1px;
+  color:var(--muted); text-transform:uppercase; text-align:left;
+  padding:5px 8px; border-bottom:1px solid var(--border); font-weight:400; position:sticky; top:0; background:var(--bg);
+}
+.log-table td { padding:7px 8px; border-bottom:1px solid rgba(23,32,48,.5); vertical-align:middle; }
+.log-table tr { animation:row-in .25s ease; }
+.log-table tr:hover td { background:rgba(12,18,32,.8); }
+@keyframes row-in{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.td-id   { font-family:var(--mono); font-size:10px; color:var(--muted); }
+.td-plate{ font-family:var(--mono); font-size:13px; color:var(--white); letter-spacing:2px; }
+.badge   { font-family:var(--mono); font-size:8px; letter-spacing:1px; padding:2px 8px; border-radius:3px; text-transform:uppercase; display:inline-block; }
+.badge.W { background:rgba(0,232,122,.12); color:var(--green); }
+.badge.B { background:rgba(255,45,85,.12);  color:var(--red); }
+.badge.U { background:rgba(255,140,0,.12);  color:var(--orange); }
+.td-time { font-family:var(--mono); font-size:9px; color:var(--muted); text-align:right; }
+.td-src  { font-family:var(--mono); font-size:8px; color:var(--muted); opacity:.6; }
+.empty   { text-align:center; padding:36px; font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; }
+
+/* RIGHT SIDEBAR */
+.dash-right { display:flex; flex-direction:column; overflow:hidden; background:var(--surf); }
+.sb-blk { padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.sb-blk.flex1 { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+
+/* Gate widget */
+.gate-box {
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--card); border:1px solid var(--border2); border-radius:8px; padding:12px 16px;
+}
+.gate-lbl { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; margin-bottom:4px; }
+.gate-val { font-family:var(--hud); font-size:17px; font-weight:700; letter-spacing:2px; }
+.gate-val.open   { color:var(--green); }
+.gate-val.closed { color:var(--red); }
+.gate-ico { font-size:26px; }
+
+/* Upload test box */
+.upload-zone {
+  border:1px dashed var(--border2); border-radius:8px;
+  padding:14px; text-align:center; cursor:pointer;
+  transition:all .2s; position:relative;
+}
+.upload-zone:hover { border-color:var(--accent); background:rgba(0,212,255,.04); }
+.upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-zone p { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; }
+.upload-zone p span { color:var(--accent); }
+.upload-result {
+  margin-top:10px; background:var(--card); border-radius:6px;
+  padding:10px 12px; display:none;
+}
+.ur-plate { font-family:var(--hud); font-size:22px; font-weight:700; letter-spacing:4px; margin-bottom:4px; }
+.ur-status { font-family:var(--mono); font-size:10px; letter-spacing:1px; }
+
+/* Donut */
+.donut-row { display:flex; align-items:center; gap:14px; }
+.dlegend { flex:1; }
+.dl { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.dl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dl-lbl { font-size:11px; color:var(--muted); flex:1; }
+.dl-val { font-family:var(--mono); font-size:12px; }
+
+/* ══════════════════ LISTS PAGE ══════════════════ */
+.lists-layout { display:grid; grid-template-columns:1fr 1fr; gap:0; height:calc(100vh - 56px - 41px - 62px); overflow:hidden; }
+.list-panel { display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
+.list-panel:last-child { border-right:none; }
+.lp-hdr { padding:14px 16px; border-bottom:1px solid var(--border); background:var(--surf); flex-shrink:0; }
+.lp-title { font-family:var(--hud); font-size:13px; font-weight:700; letter-spacing:3px; margin-bottom:2px; }
+.lp-title.wl { color:var(--green); } .lp-title.bl { color:var(--red); }
+.lp-sub { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; }
+.lp-add { padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surf); flex-shrink:0; }
+.lp-row { display:flex; gap:8px; }
+.lp-inp {
+  flex:1; background:var(--card); border:1px solid var(--border2);
+  color:var(--white); font-family:var(--mono); font-size:12px;
+  padding:7px 10px; border-radius:6px; text-transform:uppercase; letter-spacing:1px;
+}
+.lp-inp:focus { outline:none; border-color:var(--accent); }
+.lp-inp::placeholder { color:var(--muted); letter-spacing:0; }
+.lp-inp2 {
+  flex:1; background:var(--card); border:1px solid var(--border2);
+  color:var(--white); font-family:var(--ui); font-size:12px;
+  padding:7px 10px; border-radius:6px;
+}
+.lp-inp2:focus { outline:none; border-color:var(--accent); }
+.lp-inp2::placeholder { color:var(--muted); }
+.add-wl { background:var(--green); color:#000; border:none; border-radius:6px; padding:7px 14px; cursor:pointer; font-family:var(--hud); font-size:9px; font-weight:700; letter-spacing:2px; transition:opacity .2s; }
+.add-wl:hover { opacity:.8; }
+.add-bl { background:var(--red);   color:#fff; border:none; border-radius:6px; padding:7px 14px; cursor:pointer; font-family:var(--hud); font-size:9px; font-weight:700; letter-spacing:2px; transition:opacity .2s; }
+.add-bl:hover { opacity:.8; }
+.lp-body { flex:1; overflow-y:auto; }
+.lp-item {
+  display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px;
+  padding:10px 16px; border-bottom:1px solid rgba(23,32,48,.5);
+  transition:background .2s;
+}
+.lp-item:hover { background:var(--card); }
+.lp-item-plate { font-family:var(--mono); font-size:13px; letter-spacing:2px; }
+.lp-item-plate.wl { color:var(--green); } .lp-item-plate.bl { color:var(--red); }
+.lp-item-info { font-family:var(--mono); font-size:9px; color:var(--muted); }
+.rm-btn { background:none; border:none; cursor:pointer; color:var(--muted); font-size:13px; padding:3px 7px; border-radius:4px; transition:all .2s; font-family:var(--mono); }
+.rm-btn:hover { color:var(--red); background:rgba(255,45,85,.1); }
+.lp-empty { text-align:center; padding:32px; font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; }
+
+/* ══════════════════ COMMON ══════════════════ */
+.toast {
+  position:fixed; bottom:20px; right:20px; z-index:1000;
+  background:var(--card2); border:1px solid var(--border2);
+  border-radius:8px; padding:11px 18px;
+  font-family:var(--mono); font-size:11px; letter-spacing:1px;
+  transform:translateY(70px); opacity:0; transition:all .3s;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);
+}
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.ok  { border-left:3px solid var(--green); color:var(--green); }
+.toast.err { border-left:3px solid var(--red);   color:var(--red); }
+.toast.wrn { border-left:3px solid var(--orange); color:var(--orange); }
+
+::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="cm tl"></div><div class="cm tr"></div>
+<div class="cm bl"></div><div class="cm br"></div>
+
+<!-- ══ HEADER ══ -->
+<header class="hdr">
+  <div class="hdr-l">
+    <div class="hdr-icon">🚘</div>
+    <div>
+      <div class="hdr-title">AI ANPR PROJECT</div>
+      <div class="hdr-sub">AUTOMATIC NUMBER PLATE RECOGNITION · ESP32-CAM · EIOT</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="srv-box">
+      <label>SERVER</label>
+      <input type="text" id="srvUrl" value="" placeholder="http://localhost:5000"/>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="clk" id="clk">--:--:--</div>
+  </div>
+</header>
+
+<!-- ══ TABS ══ -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('lists')">📋 Whitelist / Blacklist</div>
+</div>
+
+<!-- ══ STATS BAR ══ -->
+<div class="stats-bar">
+  <div class="stt t1"><div class="stt-l">Total</div><div class="stt-v" id="stTotal">0</div><div class="stt-s">detections</div></div>
+  <div class="stt t2"><div class="stt-l">Whitelist</div><div class="stt-v" id="stWL">0</div><div class="stt-s">authorised</div></div>
+  <div class="stt t3"><div class="stt-l">Blacklist</div><div class="stt-v" id="stBL">0</div><div class="stt-s">flagged</div></div>
+  <div class="stt t4"><div class="stt-l">Unknown</div><div class="stt-v" id="stUK">0</div><div class="stt-s">unregistered</div></div>
+  <div class="stt t5"><div class="stt-l">Last Seen</div><div class="stt-v" style="font-size:14px" id="stLS">—</div><div class="stt-s">timestamp</div></div>
+</div>
+
+<!-- ══ DASHBOARD PAGE ══ -->
+<div class="page active" id="page-dashboard">
+  <div class="dash-layout">
+
+    <!-- LEFT -->
+    <div class="dash-left">
+      <!-- Hero -->
+      <div class="hero idle" id="hero">
+        <div class="hero-eye">LATEST DETECTION · PLATE NUMBER</div>
+        <div class="hero-plate" id="heroPlate">WAITING...</div>
+        <div class="hero-row">
+          <div class="hero-badge" id="heroBadge">⬤ &nbsp; STANDBY</div>
+          <div class="hero-meta" id="heroMeta">—<br>—</div>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="mini-section">
+        <div class="sec-label">Activity — Last 40 Scans</div>
+        <div class="activity" id="actChart"></div>
+      </div>
+
+      <!-- Log -->
+      <div class="log-wrap">
+        <div class="sec-label" style="position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:1">Detection Log</div>
+        <table class="log-table">
+          <thead><tr>
+            <th>#</th><th>Plate</th><th>Status</th>
+            <th>Source</th><th style="text-align:right">Time</th>
+          </tr></thead>
+          <tbody id="logBody">
+            <tr><td colspan="5"><div class="empty">NO DETECTIONS YET</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div class="dash-right">
+
+      <!-- Gate -->
+      <div class="sb-blk">
+        <div class="sec-label">Gate / Servo Status</div>
+        <div class="gate-box">
+          <div>
+            <div class="gate-lbl">SERVO GATE</div>
+            <div class="gate-val closed" id="gateVal">CLOSED</div>
+          </div>
+          <div class="gate-ico" id="gateIco">🔒</div>
+        </div>
+      </div>
+
+      <!-- Upload test -->
+      <div class="sb-blk">
+        <div class="sec-label">Test — Upload Plate Image</div>
+        <div class="upload-zone" id="dropZone">
+          <input type="file" id="fileInput" accept="image/*" onchange="handleUpload(this)"/>
+          <p>📷 Drop image or <span>click to browse</span></p>
+          <p style="margin-top:4px;font-size:9px">Supports JPG, PNG — runs full OCR pipeline</p>
+        </div>
+        <div class="upload-result" id="uploadResult">
+          <div class="ur-plate" id="urPlate">—</div>
+          <div class="ur-status" id="urStatus">—</div>
+        </div>
+      </div>
+
+      <!-- Donut -->
+      <div class="sb-blk">
+        <div class="sec-label">Distribution</div>
+        <div class="donut-row">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="30" fill="none" stroke="#172030" stroke-width="10"/>
+            <circle id="dWL" cx="40" cy="40" r="30" fill="none" stroke="#00e87a" stroke-width="10"
+                    stroke-dasharray="0 188.5" transform="rotate(-90 40 40)"
+                    style="transition:stroke-dasharray .6s"/>
+            <circle id="dBL" cx="40" cy="40" r="30" fill="none" stroke="#ff2d55" stroke-width="10"
+                    stroke-dasharray="0 188.5" style="transition:all .6s"/>
+            <circle id="dUK" cx="40" cy="40" r="30" fill="none" stroke="#ff8c00" stroke-width="10"
+                    stroke-dasharray="0 188.5" style="transition:all .6s"/>
+          </svg>
+          <div class="dlegend">
+            <div class="dl"><div class="dl-dot" style="background:var(--green)"></div><div class="dl-lbl">Whitelist</div><div class="dl-val" id="dlWL" style="color:var(--green)">0</div></div>
+            <div class="dl"><div class="dl-dot" style="background:var(--red)"></div><div class="dl-lbl">Blacklist</div><div class="dl-val" id="dlBL" style="color:var(--red)">0</div></div>
+            <div class="dl"><div class="dl-dot" style="background:var(--orange)"></div><div class="dl-lbl">Unknown</div><div class="dl-val" id="dlUK" style="color:var(--orange)">0</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clear -->
+      <div class="sb-blk" style="margin-top:auto">
+        <button onclick="clearLog()" style="width:100%;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:6px;padding:8px;cursor:pointer;font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;transition:all .2s"
+          onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'"
+          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">
+          🗑 &nbsp; Clear Vehicle Log
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LISTS PAGE ══ -->
+<div class="page" id="page-lists">
+  <div class="lists-layout">
+
+    <!-- WHITELIST -->
+    <div class="list-panel">
+      <div class="lp-hdr">
+        <div class="lp-title wl">✓ WHITELIST</div>
+        <div class="lp-sub">Authorised vehicles — gate opens automatically</div>
+      </div>
+      <div class="lp-add">
+        <div class="lp-row" style="gap:6px;margin-bottom:6px">
+          <input class="lp-inp" type="text" id="wlPlate" placeholder="KL 01 AB 1234" maxlength="13"/>
+          <button class="add-wl" onclick="addToList('whitelist')">ADD</button>
+        </div>
+        <input class="lp-inp2" type="text" id="wlOwner" placeholder="Owner name (optional)" style="width:100%"/>
+      </div>
+      <div class="lp-body" id="wlBody">
+        <div class="lp-empty">Loading...</div>
+      </div>
+    </div>
+
+    <!-- BLACKLIST -->
+    <div class="list-panel">
+      <div class="lp-hdr">
+        <div class="lp-title bl">✗ BLACKLIST</div>
+        <div class="lp-sub">Flagged / banned vehicles — alert triggered</div>
+      </div>
+      <div class="lp-add">
+        <div class="lp-row" style="gap:6px;margin-bottom:6px">
+          <input class="lp-inp" type="text" id="blPlate" placeholder="TN 09 XY 9999" maxlength="13"/>
+          <button class="add-bl" onclick="addToList('blacklist')">ADD</button>
+        </div>
+        <input class="lp-inp2" type="text" id="blReason" placeholder="Reason (e.g. stolen, banned)" style="width:100%"/>
+      </div>
+      <div class="lp-body" id="blBody">
+        <div class="lp-empty">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+let SERVER     = window.location.origin;  // Auto-detect: works when opened from Flask
+let lastCount  = 0;
+
+document.getElementById('srvUrl').value = SERVER;
+document.getElementById('srvUrl').addEventListener('change', e => {
+  SERVER = e.target.value.trim().replace(/\/$/, '');
+  lastCount = 0;
+  poll();
+});
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['dashboard','lists'][i]===tab));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${tab}`).classList.add('active');
+  if (tab === 'lists') { fetchLists(); }
+}
+
+let toastTimer;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = 'toast', 3000);
+}
+
+function setInterval2(fn, ms) { fn(); return setInterval(fn, ms); }
+
+// Clock
+setInterval(() => {
+  document.getElementById('clk').textContent = new Date().toTimeString().slice(0,8);
+}, 1000);
+
+// ═══════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════
+async function fetchStats() {
+  try {
+    const r = await fetch(`${SERVER}/stats`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('stTotal').textContent = d.total;
+    document.getElementById('stWL').textContent    = d.whitelist;
+    document.getElementById('stBL').textContent    = d.blacklist;
+    document.getElementById('stUK').textContent    = d.unknown;
+    document.getElementById('stLS').textContent    = d.last_seen ? d.last_seen.split(' ')[1] : '—';
+    document.getElementById('dlWL').textContent    = d.whitelist;
+    document.getElementById('dlBL').textContent    = d.blacklist;
+    document.getElementById('dlUK').textContent    = d.unknown;
+    updateDonut(d.whitelist, d.blacklist, d.unknown, d.total);
+  } catch {}
+}
+
+function updateDonut(wl, bl, uk, total) {
+  if (total === 0) return;
+  const C = 188.5;
+  const wF = wl/total, bF = bl/total;
+  const wL = C*wF, bL = C*bF, uL = C*(uk/total);
+  const wOff = 0, bOff = -(C*wF), uOff = -(C*(wF+bF));
+
+  document.getElementById('dWL').setAttribute('stroke-dasharray', `${wL} ${C-wL}`);
+  document.getElementById('dBL').setAttribute('stroke-dasharray', `${bL} ${C-bL}`);
+  document.getElementById('dBL').setAttribute('transform', `rotate(${-90 + wF*360} 40 40)`);
+  document.getElementById('dUK').setAttribute('stroke-dasharray', `${uL} ${C-uL}`);
+  document.getElementById('dUK').setAttribute('transform', `rotate(${-90 + (wF+bF)*360} 40 40)`);
+}
+
+// ═══════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════
+const STATUS_MAP = {
+  WHITELIST: { cls:'W', label:'WHITELIST', color:'var(--green)' },
+  BLACKLIST: { cls:'B', label:'BLACKLIST', color:'var(--red)' },
+  UNKNOWN:   { cls:'U', label:'UNKNOWN',   color:'var(--orange)' },
+};
+
+async function fetchLog() {
+  try {
+    const r   = await fetch(`${SERVER}/log?limit=60`);
+    if (!r.ok) return;
+    const log = await r.json();
+    if (log.length === lastCount) return;
+    const isNew = log.length > lastCount && lastCount > 0;
+    lastCount = log.length;
+
+    // Hero
+    if (log.length > 0) {
+      const l   = log[0];
+      const st  = STATUS_MAP[l.status] || STATUS_MAP.UNKNOWN;
+      const hero = document.getElementById('hero');
+      const cls  = l.status?.toLowerCase() || 'unknown';
+      hero.className = `hero ${cls} scan`;
+      setTimeout(() => hero.classList.remove('scan'), 800);
+
+      document.getElementById('heroPlate').textContent = l.plate || '—';
+      document.getElementById('heroMeta').innerHTML    = `${l.timestamp}<br>${(l.source||'esp32').toUpperCase()}`;
+
+      const badge = document.getElementById('heroBadge');
+      badge.innerHTML = st.cls==='W' ? '✓ &nbsp; WHITELIST — GRANTED'
+                      : st.cls==='B' ? '✗ &nbsp; BLACKLIST — ALERT!'
+                      : '? &nbsp; UNKNOWN VEHICLE';
+
+      // Gate
+      if (l.status === 'WHITELIST') {
+        document.getElementById('gateVal').textContent = 'OPEN';
+        document.getElementById('gateVal').className   = 'gate-val open';
+        document.getElementById('gateIco').textContent = '🔓';
+        setTimeout(() => {
+          document.getElementById('gateVal').textContent = 'CLOSED';
+          document.getElementById('gateVal').className   = 'gate-val closed';
+          document.getElementById('gateIco').textContent = '🔒';
+        }, 5000);
+      }
+
+      if (isNew) {
+        const t = l.status === 'WHITELIST' ? 'ok' : l.status === 'BLACKLIST' ? 'err' : 'wrn';
+        const m = l.status === 'WHITELIST' ? `✓ GRANTED: ${l.plate}`
+                : l.status === 'BLACKLIST' ? `⚠ BLACKLIST: ${l.plate}`
+                : `? UNKNOWN: ${l.plate}`;
+        toast(m, t);
+      }
+    }
+
+    // Table
+    const tbody = document.getElementById('logBody');
+    if (log.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty">NO DETECTIONS YET · WAITING FOR VEHICLES</div></td></tr>`;
+    } else {
+      tbody.innerHTML = log.map(e => {
+        const st = STATUS_MAP[e.status] || STATUS_MAP.UNKNOWN;
+        return `<tr>
+          <td class="td-id">#${e.id}</td>
+          <td class="td-plate">${e.plate||'—'}</td>
+          <td><span class="badge ${st.cls}">${st.label}</span></td>
+          <td class="td-src">${(e.source||'esp32').toUpperCase()}</td>
+          <td class="td-time">${(e.timestamp||'').split(' ')[1]||''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Activity chart
+    const chart  = document.getElementById('actChart');
+    const recent = log.slice(0,40).reverse();
+    chart.innerHTML = Array.from({length:40},(_,i)=>{
+      const e = recent[i];
+      if (!e) return `<div class="ab e" style="height:6px"></div>`;
+      const cls = e.status==='WHITELIST'?'w':e.status==='BLACKLIST'?'b':'u';
+      const h   = e.status==='WHITELIST'?38:e.status==='BLACKLIST'?32:22;
+      return `<div class="ab ${cls}" style="height:${h}px" title="${e.plate} · ${e.status}"></div>`;
+    }).join('');
+
+  } catch {}
+}
+
+// ═══════════════════════════════════════════
+// LISTS
+// ═══════════════════════════════════════════
+async function fetchLists() {
+  await fetchWhitelist();
+  await fetchBlacklist();
+}
+
+async function fetchWhitelist() {
+  try {
+    const r    = await fetch(`${SERVER}/whitelist`);
+    const list = await r.json();
+    const el   = document.getElementById('wlBody');
+    if (list.length === 0) {
+      el.innerHTML = `<div class="lp-empty">NO PLATES IN WHITELIST</div>`; return;
+    }
+    el.innerHTML = list.map(p => `
+      <div class="lp-item">
+        <div>
+          <div class="lp-item-plate wl">${p.plate}</div>
+          <div class="lp-item-info">${p.owner||'—'} · ${p.added_date||''}</div>
+        </div>
+        <div></div>
+        <button class="rm-btn" onclick="removeFromList('whitelist','${p.plate}')">✕</button>
+      </div>`).join('');
+  } catch {}
+}
+
+async function fetchBlacklist() {
+  try {
+    const r    = await fetch(`${SERVER}/blacklist`);
+    const list = await r.json();
+    const el   = document.getElementById('blBody');
+    if (list.length === 0) {
+      el.innerHTML = `<div class="lp-empty">NO PLATES IN BLACKLIST</div>`; return;
+    }
+    el.innerHTML = list.map(p => `
+      <div class="lp-item">
+        <div>
+          <div class="lp-item-plate bl">${p.plate}</div>
+          <div class="lp-item-info">${p.reason||'—'} · ${p.added_date||''}</div>
+        </div>
+        <div></div>
+        <button class="rm-btn" onclick="removeFromList('blacklist','${p.plate}')">✕</button>
+      </div>`).join('');
+  } catch {}
+}
+
+async function addToList(type) {
+  const isWL  = type === 'whitelist';
+  const plate = document.getElementById(isWL?'wlPlate':'blPlate').value.trim().toUpperCase().replace(/\s+/g,'');
+  const extra = document.getElementById(isWL?'wlOwner':'blReason').value.trim();
+  if (!plate || plate.length < 4) { toast('Enter a valid plate number', 'wrn'); return; }
+  const body  = isWL ? {plate, owner:extra} : {plate, reason:extra};
+  try {
+    const r = await fetch(`${SERVER}/${type}/add`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.status === 'already_exists') { toast(`${plate} already in ${type}`, 'wrn'); return; }
+    document.getElementById(isWL?'wlPlate':'blPlate').value = '';
+    document.getElementById(isWL?'wlOwner':'blReason').value = '';
+    fetchLists();
+    toast(`Added ${plate} to ${type}`, 'ok');
+  } catch { toast('Cannot connect to server', 'err'); }
+}
+
+async function removeFromList(type, plate) {
+  try {
+    await fetch(`${SERVER}/${type}/remove`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plate})
+    });
+    fetchLists();
+    toast(`Removed ${plate} from ${type}`, 'ok');
+  } catch { toast('Cannot connect to server', 'err'); }
+}
+
+// ═══════════════════════════════════════════
+// IMAGE UPLOAD TEST
+// ═══════════════════════════════════════════
+async function handleUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('image', file);
+  toast('Processing image...', 'ok');
+  try {
+    const r = await fetch(`${SERVER}/upload`, {method:'POST', body:form});
+    const d = await r.json();
+    const st = STATUS_MAP[d.status] || STATUS_MAP.UNKNOWN;
+    const res = document.getElementById('uploadResult');
+    res.style.display = 'block';
+    document.getElementById('urPlate').textContent  = d.plate || 'NOT DETECTED';
+    document.getElementById('urPlate').style.color  = st.color;
+    document.getElementById('urStatus').textContent = d.status || '—';
+    document.getElementById('urStatus').style.color = st.color;
+    toast(d.plate ? `Plate: ${d.plate} → ${d.status}` : 'No plate detected', d.status==='WHITELIST'?'ok':d.status==='BLACKLIST'?'err':'wrn');
+    fetchStats(); fetchLog();
+  } catch { toast('Upload failed', 'err'); }
+  input.value = '';
+}
+
+// ═══════════════════════════════════════════
+// CLEAR
+// ═══════════════════════════════════════════
+async function clearLog() {
+  if (!confirm('Clear all vehicle detection logs?')) return;
+  try {
+    await fetch(`${SERVER}/clear`, {method:'POST'});
+    lastCount = 0; poll();
+    toast('Vehicle log cleared', 'ok');
+  } catch { toast('Cannot connect', 'err'); }
+}
+
+// ═══════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════
+document.getElementById('wlPlate').addEventListener('keydown',e=>{ if(e.key==='Enter') addToList('whitelist'); });
+document.getElementById('blPlate').addEventListener('keydown',e=>{ if(e.key==='Enter') addToList('blacklist'); });
+
+// ═══════════════════════════════════════════
+// POLL
+// ═══════════════════════════════════════════
+function poll() { fetchStats(); fetchLog(); }
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
