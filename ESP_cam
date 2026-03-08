@@ -1,0 +1,287 @@
+/*
+  🚗 SMART GATE SYSTEM - ESP32-CAM CODE
+  License Plate Recognition Camera Module
+  
+  Upload to: ESP32-CAM
+*/
+
+#include "esp_camera.h"
+#include <WiFi.h>
+#include <WebServer.h>
+
+// ============================================
+// CAMERA PIN CONFIGURATION (DO NOT CHANGE)
+// ============================================
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM      0
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
+
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       21
+#define Y4_GPIO_NUM       19
+#define Y3_GPIO_NUM       18
+#define Y2_GPIO_NUM        5
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
+
+// ============================================
+// WiFi Configuration - CHANGE THESE!
+// ============================================
+const char* ssid = "syedhaja";            // WiFi name
+const char* password = "thasneem2011";    // WiFi password
+
+// ============================================
+// Server Configuration
+// ============================================
+WebServer server(80);
+
+// IP Address of your Flask/Frontend server
+String serverIP = "localhost";  // Frontend running at http://localhost:5000
+// GitHub: https://github.com/godwin-stanes/AI_ANPR_PROJECT.git
+
+// ============================================
+// Setup
+// ============================================
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+  
+  Serial.println("\n\n=================================");
+  Serial.println("🚗 SMART GATE - ESP32-CAM");
+  Serial.println("=================================");
+  
+  // Initialize camera
+  Serial.println("📷 Initializing camera...");
+  if (!initCamera()) {
+    Serial.println("❌ Camera init failed!");
+    while(1);
+  }
+  Serial.println("✓ Camera ready!");
+  
+  // Connect to WiFi
+  Serial.println("📡 Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✓ WiFi Connected!");
+    Serial.print("📍 IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ WiFi connection failed!");
+  }
+  
+  // Setup endpoints
+  server.on("/capture", HTTP_POST, handleCapture);
+  server.on("/health", HTTP_GET, handleHealth);
+  server.on("/stream", HTTP_GET, handleStream);
+  server.on("/snapshot", HTTP_GET, handleSnapshot);
+  server.on("/", HTTP_GET, handleRoot);
+  server.onNotFound([]() {
+    addCORSHeaders();
+    server.send(204, "text/plain", "");
+  });
+  server.begin();
+  
+  Serial.println("✓ Web server started!");
+  Serial.println("📷 Live stream: http://" + WiFi.localIP().toString() + "/stream");
+  Serial.println("📸 Snapshot:    http://" + WiFi.localIP().toString() + "/snapshot");
+  Serial.println("=================================\n");
+}
+
+// ============================================
+// Main Loop
+// ============================================
+void loop() {
+  server.handleClient();
+}
+
+// ============================================
+// Initialize Camera
+// ============================================
+bool initCamera() {
+  camera_config_t config;
+  
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+  config.frame_size = FRAMESIZE_VGA;      // 640x480
+  config.jpeg_quality = 10;                // Quality 1-63 (lower = better)
+  config.fb_count = 1;
+  
+  if (esp_camera_init(&config) != ESP_OK) {
+    return false;
+  }
+  
+  // Adjust camera settings
+  sensor_t * s = esp_camera_sensor_get();
+  if (s != NULL) {
+    s->set_brightness(s, 0);               // brightness: -2 to 2
+    s->set_contrast(s, 0);                 // contrast: -2 to 2
+    s->set_saturation(s, 0);               // saturation: -2 to 2
+    s->set_special_effect(s, 0);           // 0 to 6 (0=normal)
+    s->set_whitebal(s, 1);                 // white balance
+    s->set_awb_gain(s, 1);
+    s->set_wb_mode(s, 0);
+    s->set_exposure_ctrl(s, 1);
+    s->set_aec2(s, 0);                     // auto exposure
+    s->set_aec_value(s, 300);
+    s->set_agc_gain(s, 0);                 // auto gain
+    s->set_gainceiling(s, (gainceiling_t)0);
+    s->set_bpc(s, 1);
+    s->set_wpc(s, 1);
+    s->set_raw_gma(s, 1);
+    s->set_lenc(s, 1);                     // lens distortion
+    s->set_hmirror(s, 0);                  // horizontal flip
+    s->set_vflip(s, 0);                    // vertical flip
+    s->set_dcw(s, 1);
+    s->set_colorbar(s, 0);
+  }
+  
+  return true;
+}
+
+// ============================================
+// Add CORS headers helper
+// ============================================
+void addCORSHeaders() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+// ============================================
+// Capture Image Endpoint
+// ============================================
+void handleCapture() {
+  addCORSHeaders();
+  Serial.println("📸 Capture request received...");
+  
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("❌ Camera capture failed");
+    server.send(500, "text/plain", "Camera capture failed");
+    return;
+  }
+  
+  Serial.print("✓ Image size: ");
+  Serial.print(fb->len);
+  Serial.println(" bytes");
+  
+  // Send image data
+  server.sendHeader("Content-Type", "image/jpeg");
+  server.sendHeader("Content-Length", String(fb->len));
+  server.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
+  
+  esp_camera_fb_return(fb);
+  Serial.println("✓ Image sent to server");
+}
+
+// ============================================
+// Homepage
+// ============================================
+void handleRoot() {
+  addCORSHeaders();
+  String html = "<html><head><title>ESP32-CAM</title>";
+  html += "<style>body{background:#111;color:#fff;font-family:sans-serif;text-align:center;padding:20px;}";
+  html += "h1{color:#00ff88;} img{width:640px;border:2px solid #00ff88;border-radius:8px;}";
+  html += "a{display:inline-block;margin:10px;padding:10px 20px;background:#00ff88;color:#111;border-radius:5px;text-decoration:none;font-weight:bold;}";
+  html += "</style></head><body>";
+  html += "<h1>🚗 SMART GATE - ESP32-CAM</h1>";
+  html += "<p>IP: " + WiFi.localIP().toString() + "</p>";
+  html += "<img src='/stream' /><br>";
+  html += "<a href='/snapshot'>📸 Snapshot</a>";
+  html += "<a href='/health'>💚 Health</a>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+// ============================================
+// Live Stream Endpoint
+// ============================================
+void handleStream() {
+  WiFiClient client = server.client();
+  
+  String response = "HTTP/1.1 200 OK\r\n";
+  response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
+  client.print(response);
+
+  while (client.connected()) {
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("❌ Stream capture failed");
+      break;
+    }
+
+    client.print("--frame\r\n");
+    client.print("Content-Type: image/jpeg\r\n");
+    client.print("Content-Length: " + String(fb->len) + "\r\n\r\n");
+    client.write(fb->buf, fb->len);
+    client.print("\r\n");
+
+    esp_camera_fb_return(fb);
+    delay(100); // ~10fps
+  }
+}
+
+// ============================================
+// Snapshot (GET) Endpoint
+// ============================================
+void handleSnapshot() {
+  addCORSHeaders();
+  Serial.println("📸 Snapshot request received...");
+
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    server.send(500, "text/plain", "Camera capture failed");
+    return;
+  }
+
+  server.sendHeader("Content-Type", "image/jpeg");
+  server.sendHeader("Content-Length", String(fb->len));
+  server.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
+
+  esp_camera_fb_return(fb);
+  Serial.println("✓ Snapshot sent");
+}
+
+
+void handleHealth() {
+  addCORSHeaders();
+  Serial.println("🏥 Health check");
+  String json = "{\"status\":\"ok\",\"ip\":\"";
+  json += WiFi.localIP().toString();
+  json += "\"}";
+  server.send(200, "application/json", json);
+}
+
