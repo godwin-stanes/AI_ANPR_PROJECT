@@ -10,9 +10,18 @@ import csv
 from datetime import datetime
 from io import StringIO, BytesIO
 import json
+import urllib.request
+import requests as req_lib
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
+
+# ============================================
+# ESP32-CAM Configuration
+# ============================================
+ESP32_CAM_IP = "192.168.1.8"
+ESP32_CAM_STREAM_URL = f"http://{ESP32_CAM_IP}/stream"
+ESP32_CAM_SNAPSHOT_URL = f"http://{ESP32_CAM_IP}/snapshot"
 
 os.makedirs('static/uploads', exist_ok=True)
 
@@ -111,6 +120,42 @@ def save_settings(settings):
 def index():
     return send_file("index.html")
 
+# ============================================
+# ESP32-CAM Live Stream Proxy
+# ============================================
+@app.route("/cam_stream")
+def cam_stream():
+    """Proxies the live MJPEG stream from ESP32-CAM to the frontend"""
+    def generate():
+        try:
+            r = req_lib.get(ESP32_CAM_STREAM_URL, stream=True, timeout=10)
+            for chunk in r.iter_content(chunk_size=1024):
+                yield chunk
+        except Exception as e:
+            print(f"❌ CAM stream error: {e}")
+            yield b''
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route("/cam_snapshot")
+def cam_snapshot():
+    """Gets a single snapshot from ESP32-CAM"""
+    try:
+        r = req_lib.get(ESP32_CAM_SNAPSHOT_URL, timeout=5)
+        return Response(r.content, mimetype='image/jpeg')
+    except Exception as e:
+        print(f"❌ Snapshot error: {e}")
+        return jsonify({"error": "CAM offline"}), 503
+
+@app.route("/cam_status")
+def cam_status():
+    """Check if ESP32-CAM is reachable"""
+    try:
+        r = req_lib.get(f"http://{ESP32_CAM_IP}/health", timeout=3)
+        data = r.json()
+        return jsonify({"online": True, "ip": ESP32_CAM_IP, "cam_data": data}), 200
+    except:
+        return jsonify({"online": False, "ip": ESP32_CAM_IP}), 200
+
 @app.route("/stream")
 def stream():
     global frame_buffer, camera_active
@@ -132,12 +177,96 @@ def stream():
 
 @app.route("/ir_trigger", methods=["POST"])
 def ir_trigger():
-    global camera_active, detection_result, detected_plate
+    global camera_active, detection_result, detected_plate, frame_buffer
     camera_active = True
     detection_result = "PROCESSING"
     detected_plate = ""
-    print("\n🚨 IR TRIGGERED!")
-    return jsonify({"status": "ok"}), 200
+    print("\n🚨 IR TRIGGERED! Pulling image from ESP32-CAM...")
+
+    try:
+        # Pull image directly from ESP32-CAM
+        r = req_lib.get(ESP32_CAM_SNAPSHOT_URL, timeout=10)
+        img_bytes = r.content
+        print(f"  ✓ Got image from CAM: {len(img_bytes)} bytes")
+
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if img is not None:
+            frame_buffer.clear()
+            frame_buffer.append(img)
+
+        # Preprocess image for better OCR
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        img_for_ocr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+        # Now run OCR on the image
+        results = reader.readtext(img_for_ocr) if img is not None else []
+        if not results:
+            results = reader.readtext(img)  # fallback to original
+
+        if not results or img is None:
+            detection_result = "NO_PLATE"
+            camera_active = False
+            return jsonify({"status": "ok", "result": "DENIED", "reason": "no plate detected"}), 200
+
+        text = " ".join([r[1] for r in results]).upper()
+        plate = "".join([c for c in text if c.isalnum()])
+
+        if len(plate) < 5:
+            detection_result = "NO_PLATE"
+            camera_active = False
+            return jsonify({"status": "ok", "result": "DENIED", "reason": "plate too short"}), 200
+
+        print(f"  ✓ Detected plate: {plate}")
+        detected_plate = plate
+
+        whitelist = read_csv(WHITELIST_FILE)
+        blacklist = read_csv(BLACKLIST_FILE)
+        plate_upper = plate.upper()
+        is_whitelisted = any(w['plate'].upper() == plate_upper for w in whitelist)
+        is_blacklisted = any(b['plate'].upper() == plate_upper for b in blacklist)
+
+        if is_blacklisted:
+            status = "BLACKLIST"
+            result = "DENY"
+        elif is_whitelisted:
+            status = "WHITELIST"
+            result = "ALLOW"
+        else:
+            status = "UNKNOWN"
+            result = "DENY"
+
+        detection_result = "ALLOWED" if result == "ALLOW" else "DENIED"
+
+        filename = f"{int(time.time())}_{plate}.jpg"
+        cv2.imwrite(f"static/uploads/{filename}", img)
+
+        confidence = float(np.mean([r[2] for r in results if len(r) > 2]))
+        log_entry = {
+            'id': len(read_csv(LOG_FILE)) + 1,
+            'plate': plate,
+            'status': status,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'image_file': filename,
+            'confidence': f"{confidence:.2f}"
+        }
+        append_csv(LOG_FILE, log_entry, ['id', 'plate', 'status', 'timestamp', 'image_file', 'confidence'])
+
+        camera_active = False
+        gc.collect()
+
+        print(f"  ✓ Result: {result} | Plate: {plate} | Status: {status}")
+        return jsonify({"status": "ok", "result": result, "plate": plate}), 200
+
+    except Exception as e:
+        print(f"  ❌ Error pulling from CAM: {e}")
+        camera_active = False
+        detection_result = "DENIED"
+        return jsonify({"status": "ok", "result": "DENIED", "reason": str(e)}), 200
 
 @app.route("/capture", methods=["POST"])
 def capture():
@@ -428,22 +557,19 @@ def export_pdf():
         doc = SimpleDocTemplate(output, pagesize=letter)
         elements = []
         
-        # Title
         styles = getSampleStyleSheet()
         title = Paragraph("Smart Gate System - Detection Report", styles['Title'])
         elements.append(title)
         elements.append(Spacer(1, 0.3))
         
-        # Summary
         summary = f"Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>Total Detections: {len(rows)}"
         summary_para = Paragraph(summary, styles['Normal'])
         elements.append(summary_para)
         elements.append(Spacer(1, 0.3))
         
-        # Table
         if rows:
             data = [['Plate', 'Status', 'Timestamp', 'Confidence']]
-            for row in rows[-20:]:  # Last 20
+            for row in rows[-20:]:
                 data.append([
                     row.get('plate', '--'),
                     row.get('status', '--'),
