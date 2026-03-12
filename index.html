@@ -347,7 +347,7 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
       <div class="cam-box">
         <div class="stream-label">LIVE</div>
         <span class="cam-status-badge cam-offline-badge" id="cam-badge">● CAM OFFLINE</span>
-        <img id="cam-img" src="http://192.168.1.8/stream"
+        <img id="cam-img" src="http://192.168.65.219/stream"
              onerror="camError()"
              onload="camLoaded()"
              alt="Live Camera Feed" />
@@ -483,7 +483,7 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
 </div>
 
 <script>
-const SERVER = "http://localhost:5000";
+const SERVER = "http://192.168.65.198:5000";
 let camOk = false;
 
 // ── Camera stream handling ──
@@ -509,7 +509,7 @@ function retryCam() {
   const img = document.getElementById('cam-img');
   img.style.display = 'block';
   document.getElementById('cam-offline-msg').style.display = 'none';
-  img.src = 'http://192.168.1.8/stream?' + Date.now();
+  img.src = 'http://192.168.65.219/stream?' + Date.now();
 }
 
 // Check cam status every 10s

@@ -19,7 +19,7 @@ CORS(app)
 # ============================================
 # ESP32-CAM Configuration
 # ============================================
-ESP32_CAM_IP = "192.168.1.8"
+ESP32_CAM_IP = "192.168.65.219"
 ESP32_CAM_STREAM_URL = f"http://{ESP32_CAM_IP}/stream"
 ESP32_CAM_SNAPSHOT_URL = f"http://{ESP32_CAM_IP}/snapshot"
 
