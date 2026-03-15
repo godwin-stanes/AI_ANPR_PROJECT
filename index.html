@@ -347,7 +347,7 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
       <div class="cam-box">
         <div class="stream-label">LIVE</div>
         <span class="cam-status-badge cam-offline-badge" id="cam-badge">● CAM OFFLINE</span>
-        <img id="cam-img" src="http://192.168.65.219/stream"
+        <img id="cam-img" src="http://172.20.10.3:5000/cam_stream"
              onerror="camError()"
              onload="camLoaded()"
              alt="Live Camera Feed" />
@@ -483,7 +483,7 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
 </div>
 
 <script>
-const SERVER = "http://192.168.65.198:5000";
+const SERVER = "http://172.20.10.3:5000";
 let camOk = false;
 
 // ── Camera stream handling ──
@@ -509,7 +509,7 @@ function retryCam() {
   const img = document.getElementById('cam-img');
   img.style.display = 'block';
   document.getElementById('cam-offline-msg').style.display = 'none';
-  img.src = 'http://192.168.65.219/stream?' + Date.now();
+  img.src = 'http://172.20.10.3:5000/cam_stream?' + Date.now();
 }
 
 // Check cam status every 10s
@@ -526,8 +526,8 @@ loadWhitelist();
 loadBlacklist();
 loadSettings();
 loadRecentLog();
-setInterval(checkStatus, 1000);
-setInterval(loadStats, 3000);
+setInterval(checkStatus, 3000)
+setInterval(loadStats, 5000);
 
 function switchTab(tabName, btn) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
