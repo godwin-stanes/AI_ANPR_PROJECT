@@ -109,7 +109,7 @@ void loop() {
 }
 
 // ============================================
-// Initialize Camera
+// Initialize Camera - CHANGED for ANPR
 // ============================================
 bool initCamera() {
   camera_config_t config;
@@ -135,35 +135,34 @@ bool initCamera() {
   
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;      // 640x480
-  config.jpeg_quality = 10;                // Quality 1-63 (lower = better)
-  config.fb_count = 1;
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 8;                 // ✅ CHANGED: sharper image for plate reading (was 10)
+  config.fb_count = 2;                     // ✅ CHANGED: double buffer reduces capture lag (was 1)
   
   if (esp_camera_init(&config) != ESP_OK) {
     return false;
   }
   
-  // Adjust camera settings
   sensor_t * s = esp_camera_sensor_get();
   if (s != NULL) {
-    s->set_brightness(s, 0);               // brightness: -2 to 2
-    s->set_contrast(s, 0);                 // contrast: -2 to 2
-    s->set_saturation(s, 0);               // saturation: -2 to 2
-    s->set_special_effect(s, 0);           // 0 to 6 (0=normal)
-    s->set_whitebal(s, 1);                 // white balance
+    s->set_brightness(s, 1);               // ✅ CHANGED: slight brightness boost (was 0)
+    s->set_contrast(s, 1);                 // ✅ CHANGED: higher contrast helps OCR (was 0)
+    s->set_saturation(s, 0);
+    s->set_special_effect(s, 0);
+    s->set_whitebal(s, 1);
     s->set_awb_gain(s, 1);
     s->set_wb_mode(s, 0);
     s->set_exposure_ctrl(s, 1);
-    s->set_aec2(s, 0);                     // auto exposure
+    s->set_aec2(s, 1);                     // ✅ CHANGED: enable AEC2 for better auto exposure (was 0)
     s->set_aec_value(s, 300);
-    s->set_agc_gain(s, 0);                 // auto gain
+    s->set_agc_gain(s, 0);
     s->set_gainceiling(s, (gainceiling_t)0);
     s->set_bpc(s, 1);
     s->set_wpc(s, 1);
     s->set_raw_gma(s, 1);
-    s->set_lenc(s, 1);                     // lens distortion
-    s->set_hmirror(s, 0);                  // horizontal flip
-    s->set_vflip(s, 0);                    // vertical flip
+    s->set_lenc(s, 1);
+    s->set_hmirror(s, 0);
+    s->set_vflip(s, 0);
     s->set_dcw(s, 1);
     s->set_colorbar(s, 0);
   }
@@ -227,7 +226,7 @@ void handleRoot() {
 }
 
 // ============================================
-// Live Stream Endpoint
+// Live Stream Endpoint - CHANGED for ANPR
 // ============================================
 void handleStream() {
   WiFiClient client = server.client();
@@ -250,7 +249,7 @@ void handleStream() {
     client.print("\r\n");
 
     esp_camera_fb_return(fb);
-    delay(100); // ~10fps
+    delay(33); // ✅ CHANGED: ~30fps for smoother ANPR detection (was 100ms / 10fps)
   }
 }
 
