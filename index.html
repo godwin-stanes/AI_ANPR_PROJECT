@@ -21,9 +21,7 @@
   --danger: #ff1744;
   --info: #00b4ff;
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
   background: linear-gradient(135deg, var(--bg-darker) 0%, #0f1835 50%, var(--bg-dark) 100%);
   color: var(--text);
@@ -31,291 +29,153 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
-
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: 
-    linear-gradient(0deg, transparent 24%, rgba(0, 217, 255, 0.02) 25%, rgba(0, 217, 255, 0.02) 26%, transparent 27%),
-    linear-gradient(90deg, transparent 24%, rgba(0, 217, 255, 0.02) 25%, rgba(0, 217, 255, 0.02) 26%, transparent 27%);
+  background-image:
+    linear-gradient(0deg, transparent 24%, rgba(0,217,255,0.02) 25%, rgba(0,217,255,0.02) 26%, transparent 27%),
+    linear-gradient(90deg, transparent 24%, rgba(0,217,255,0.02) 25%, rgba(0,217,255,0.02) 26%, transparent 27%);
   background-size: 50px 50px;
   pointer-events: none;
   z-index: 0;
   animation: grid-move 20s linear infinite;
 }
-
 @keyframes grid-move {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(50px, 50px); }
+  0% { transform: translate(0,0); }
+  100% { transform: translate(50px,50px); }
 }
-
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 200;
-  background: rgba(5, 7, 15, 0.95);
+  position: sticky; top: 0; z-index: 200;
+  background: rgba(5,7,15,0.95);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: flex; justify-content: space-between; align-items: center;
 }
-
 .header-title {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 28px; font-weight: 700;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
-
 .status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: flex; align-items: center; gap: 8px;
   padding: 8px 16px;
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid var(--success);
-  border-radius: 8px;
-  color: var(--success);
-  font-weight: 600;
+  background: rgba(0,255,136,0.1); border: 1px solid var(--success);
+  border-radius: 8px; color: var(--success); font-weight: 600;
 }
-
 .status-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--success);
-  border-radius: 50%;
+  width: 8px; height: 8px;
+  background: var(--success); border-radius: 50%;
   animation: pulse 2s infinite;
 }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 30px 20px;
-  position: relative;
-  z-index: 10;
+  max-width: 1400px; margin: 0 auto;
+  padding: 30px 20px; position: relative; z-index: 10;
 }
-
 .tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  display: flex; gap: 10px; margin-bottom: 30px;
+  border-bottom: 1px solid var(--border); overflow-x: auto;
 }
-
 .tab-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  padding: 12px 20px;
-  cursor: pointer;
-  font-weight: 600;
-  position: relative;
-  transition: color 0.3s ease;
+  background: none; border: none; color: var(--text-muted);
+  padding: 12px 20px; cursor: pointer; font-weight: 600;
+  position: relative; transition: color 0.3s ease;
 }
-
 .tab-btn.active { color: var(--accent-primary); }
-
 .tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent-primary);
+  content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+  height: 2px; background: var(--accent-primary);
 }
-
 .tab-content { display: none; animation: fadeIn 0.3s ease; }
 .tab-content.active { display: block; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 .detection-area {
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.05), rgba(255, 0, 110, 0.05));
+  background: linear-gradient(135deg, rgba(0,217,255,0.05), rgba(255,0,110,0.05));
   border: 2px solid var(--border-accent);
-  border-radius: 20px;
-  padding: 20px;
-  margin-bottom: 30px;
-  position: relative;
-  min-height: 300px;
+  border-radius: 20px; padding: 20px; margin-bottom: 30px;
+  position: relative; min-height: 300px;
 }
-
-/* ── Live Camera Box ── */
 .cam-box {
-  position: relative;
-  width: 100%;
-  background: #000;
-  border-radius: 14px;
-  overflow: hidden;
-  min-height: 260px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative; width: 100%; background: #000;
+  border-radius: 14px; overflow: hidden; min-height: 260px;
+  display: flex; align-items: center; justify-content: center;
   margin-bottom: 20px;
 }
-
-.cam-box img {
-  width: 100%;
-  max-height: 420px;
-  object-fit: contain;
-  display: block;
-}
-
-.cam-offline {
-  color: var(--text-muted);
-  font-size: 16px;
-  text-align: center;
-  padding: 40px;
-}
-
+.cam-box img { width: 100%; max-height: 420px; object-fit: contain; display: block; }
+.cam-offline { color: var(--text-muted); font-size: 16px; text-align: center; padding: 40px; }
 .stream-label {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(0,0,0,0.75);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--accent-primary);
-  font-weight: 700;
-  z-index: 10;
+  position: absolute; top: 12px; left: 12px;
+  background: rgba(0,0,0,0.75); padding: 6px 12px;
+  border-radius: 6px; font-size: 12px; color: var(--accent-primary);
+  font-weight: 700; z-index: 10;
 }
-
-.stream-label::before {
-  content: "● ";
-  color: var(--danger);
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
+.stream-label::before { content: "● "; color: var(--danger); animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 .cam-status-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  z-index: 10;
+  position: absolute; top: 12px; right: 12px;
+  padding: 5px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; z-index: 10;
 }
-
-.cam-online  { background: rgba(0,255,136,0.2); color: var(--success);  border: 1px solid var(--success); }
-.cam-offline-badge { background: rgba(255,23,68,0.2);  color: var(--danger);   border: 1px solid var(--danger); }
-
-/* Detection result strip */
+.cam-online      { background: rgba(0,255,136,0.2); color: var(--success); border: 1px solid var(--success); }
+.cam-offline-badge { background: rgba(255,23,68,0.2); color: var(--danger); border: 1px solid var(--danger); }
 .result-strip {
-  display: none;
-  padding: 16px 20px;
-  border-radius: 10px;
-  margin-top: 10px;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  display: none; padding: 16px 20px; border-radius: 10px;
+  margin-top: 10px; align-items: center; gap: 20px; flex-wrap: wrap;
 }
-
-.result-strip.show { display: flex; }
+.result-strip.show    { display: flex; }
 .result-strip.allowed { background: rgba(0,255,136,0.1); border: 2px solid var(--success); }
 .result-strip.denied  { background: rgba(255,23,68,0.1);  border: 2px solid var(--danger); }
-
 .plate-number {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--accent-primary);
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 6px;
+  font-size: 36px; font-weight: 700; color: var(--accent-primary);
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 6px;
   text-shadow: 0 0 20px rgba(0,217,255,0.4);
 }
-
-.plate-status {
-  display: inline-block;
-  padding: 10px 22px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 18px;
-}
-
+.plate-status { display: inline-block; padding: 10px 22px; border-radius: 8px; font-weight: 600; font-size: 18px; }
 .status-allowed { background: rgba(0,255,136,0.2); color: var(--success); border: 2px solid var(--success); }
 .status-denied  { background: rgba(255,23,68,0.2);  color: var(--danger);  border: 2px solid var(--danger); }
-
 .waiting-text { color: var(--text-muted); font-size: 16px; text-align: center; padding: 20px 0; }
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 20px; margin-bottom: 30px; }
 .stat-card {
-  background: linear-gradient(135deg, rgba(0,217,255,0.1), rgba(0,180,255,0.05));
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 24px;
-  transition: all 0.3s ease;
+  background: linear-gradient(135deg,rgba(0,217,255,0.1),rgba(0,180,255,0.05));
+  border: 1px solid var(--border); border-radius: 16px; padding: 24px; transition: all 0.3s ease;
 }
-
 .stat-card:hover { border-color: var(--accent-primary); box-shadow: 0 0 30px rgba(0,217,255,0.2); }
-
 .stat-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; margin-bottom: 10px; }
 .stat-value { font-size: 36px; font-weight: 700; color: var(--accent-primary); }
-
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text); }
 .form-group input, .form-group textarea {
   width: 100%; padding: 12px;
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text); font-family: inherit;
-  transition: border 0.3s ease;
+  border-radius: 8px; color: var(--text); font-family: inherit; transition: border 0.3s ease;
 }
 .form-group input:focus, .form-group textarea:focus {
-  outline: none; border-color: var(--accent-primary);
-  box-shadow: 0 0 10px rgba(0,217,255,0.2);
+  outline: none; border-color: var(--accent-primary); box-shadow: 0 0 10px rgba(0,217,255,0.2);
 }
-
 .list-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px; background: var(--bg-card);
   border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px;
 }
-.list-item-plate { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--accent-primary); }
+.list-item-plate { font-family: 'JetBrains Mono',monospace; font-weight: 600; color: var(--accent-primary); }
 .list-item-info  { color: var(--text-muted); font-size: 12px; }
-
 button {
   background: linear-gradient(135deg, var(--accent-primary), var(--info));
   color: #000; border: none; padding: 12px 24px;
   border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;
 }
 button:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(0,217,255,0.4); }
-button.danger   { background: linear-gradient(135deg, var(--danger), #cc0000); }
-button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); }
-
+button.danger    { background: linear-gradient(135deg, var(--danger), #cc0000); color: #fff; }
+button.secondary { background: linear-gradient(135deg, var(--warning), #ff9500); }
 .notification {
   position: fixed; top: 100px; right: 20px;
   background: var(--bg-card); border: 2px solid var(--border-accent);
   border-radius: 12px; padding: 16px; color: var(--accent-primary);
   animation: slideInRight 0.3s ease; z-index: 1000;
 }
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(400px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
+@keyframes slideInRight { from{opacity:0;transform:translateX(400px)} to{opacity:1;transform:translateX(0)} }
 .notification.success { border-color: var(--success); color: var(--success); }
 .notification.danger  { border-color: var(--danger);  color: var(--danger); }
 </style>
@@ -341,24 +201,18 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
 
   <!-- DETECTION TAB -->
   <div id="detection" class="tab-content active">
-
     <div class="detection-area">
-      <!-- Live Camera Box — always visible -->
       <div class="cam-box">
         <div class="stream-label">LIVE</div>
         <span class="cam-status-badge cam-offline-badge" id="cam-badge">● CAM OFFLINE</span>
-        <img id="cam-img" src="http://172.20.10.3:5000/cam_stream"
-             onerror="camError()"
-             onload="camLoaded()"
-             alt="Live Camera Feed" />
-        <div class="cam-offline" id="cam-offline-msg" style="display:none;">
+        <!-- src set dynamically by JS — no hardcoded IP -->
+        <img id="cam-img" src="" onerror="camError()" onload="camLoaded()" alt="Live Camera Feed" style="display:none;"/>
+        <div class="cam-offline" id="cam-offline-msg">
           📷 Camera Offline<br>
-          <small style="color:var(--text-muted);">Check ESP32-CAM connection</small><br><br>
+          <small style="color:var(--text-muted);">Check DroidCam connection</small><br><br>
           <button onclick="retryCam()" style="padding:8px 16px;font-size:13px;">↺ Retry</button>
         </div>
       </div>
-
-      <!-- Detection result strip -->
       <div class="result-strip" id="result-strip">
         <div>
           <div style="color:var(--text-muted);font-size:12px;margin-bottom:4px;">DETECTED PLATE</div>
@@ -366,27 +220,14 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
         </div>
         <div class="plate-status" id="plate-status"></div>
       </div>
-
       <div class="waiting-text" id="waiting-text">⏳ Waiting for vehicle...</div>
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Detections</div>
-        <div class="stat-value" id="stat-total">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Granted</div>
-        <div class="stat-value" id="stat-granted">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Denied</div>
-        <div class="stat-value" id="stat-denied">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Sensitivity</div>
-        <div class="stat-value" id="stat-sensitivity">80%</div>
-      </div>
+      <div class="stat-card"><div class="stat-label">Total Detections</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Granted</div><div class="stat-value" id="stat-granted">0</div></div>
+      <div class="stat-card"><div class="stat-label">Denied</div><div class="stat-value" id="stat-denied">0</div></div>
+      <div class="stat-card"><div class="stat-label">Sensitivity</div><div class="stat-value" id="stat-sensitivity">80%</div></div>
     </div>
   </div>
 
@@ -396,14 +237,8 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
     <div style="margin-bottom:30px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
       <h4 style="margin-bottom:15px;">Add to Whitelist</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
-        <div class="form-group">
-          <label>Plate Number</label>
-          <input type="text" id="whitelist-plate" placeholder="TN23DB7356">
-        </div>
-        <div class="form-group">
-          <label>Owner Name</label>
-          <input type="text" id="whitelist-owner" placeholder="John Doe">
-        </div>
+        <div class="form-group"><label>Plate Number</label><input type="text" id="whitelist-plate" placeholder="TN23DB7356"></div>
+        <div class="form-group"><label>Owner Name</label><input type="text" id="whitelist-owner" placeholder="John Doe"></div>
       </div>
       <button onclick="addWhitelist()" style="width:100%;">Add to Whitelist</button>
     </div>
@@ -416,14 +251,8 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
     <div style="margin-bottom:30px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
       <h4 style="margin-bottom:15px;">Add to Blacklist</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
-        <div class="form-group">
-          <label>Plate Number</label>
-          <input type="text" id="blacklist-plate" placeholder="TN23DB7356">
-        </div>
-        <div class="form-group">
-          <label>Reason</label>
-          <input type="text" id="blacklist-reason" placeholder="Stolen vehicle">
-        </div>
+        <div class="form-group"><label>Plate Number</label><input type="text" id="blacklist-plate" placeholder="TN23DB7356"></div>
+        <div class="form-group"><label>Reason</label><input type="text" id="blacklist-reason" placeholder="Stolen vehicle"></div>
       </div>
       <button onclick="addBlacklist()" style="width:100%;">Add to Blacklist</button>
     </div>
@@ -439,20 +268,9 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
         <input type="range" id="sensitivity" min="0" max="100" value="80" style="width:100%;">
         <div style="margin-top:10px;color:var(--text-muted);" id="sensitivity-value">80%</div>
       </div>
-      <div class="form-group">
-        <label>Gate Open Duration (seconds)</label>
-        <input type="number" id="gate-duration" value="5" min="1" max="60">
-      </div>
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-          <input type="checkbox" id="auto-log" checked> Automatic Logging
-        </label>
-      </div>
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-          <input type="checkbox" id="notifications" checked> Enable Notifications
-        </label>
-      </div>
+      <div class="form-group"><label>Gate Open Duration (seconds)</label><input type="number" id="gate-duration" value="5" min="1" max="60"></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="auto-log" checked> Automatic Logging</label></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="notifications" checked> Enable Notifications</label></div>
       <button onclick="saveSettings()" style="width:100%;">✓ Save Settings</button>
     </div>
   </div>
@@ -461,9 +279,9 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
   <div id="reports" class="tab-content">
     <h3 style="margin-bottom:20px;">📊 Export Reports</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:30px;">
-      <button onclick="exportCSV()" style="padding:30px;font-size:16px;height:auto;">📄 Export CSV</button>
+      <button onclick="exportCSV()"  style="padding:30px;font-size:16px;height:auto;">📄 Export CSV</button>
       <button onclick="exportJSON()" style="padding:30px;font-size:16px;height:auto;">📋 Export JSON</button>
-      <button onclick="exportPDF()" style="padding:30px;font-size:16px;height:auto;">📕 Export PDF</button>
+      <button onclick="exportPDF()"  style="padding:30px;font-size:16px;height:auto;">📕 Export PDF</button>
       <button onclick="clearLog()" class="danger" style="padding:30px;font-size:16px;height:auto;">🗑️ Clear Logs</button>
     </div>
     <h4 style="margin-bottom:15px;">Recent Detections</h4>
@@ -483,10 +301,22 @@ button.secondary{ background: linear-gradient(135deg, var(--warning), #ff9500); 
 </div>
 
 <script>
-const SERVER = "http://172.20.10.3:5000";
+// ============================================================
+//  SERVER URL — always points to whatever host served this page
+//  Works on ANY IP without ever editing this file again
+// ============================================================
+const SERVER = window.location.origin;   // e.g. http://10.50.255.198:5000
+
 let camOk = false;
 
-// ── Camera stream handling ──
+// ── Start camera stream using dynamic SERVER url ────────────
+function startCam() {
+  const img = document.getElementById('cam-img');
+  img.src = SERVER + '/cam_stream';
+  img.style.display = 'block';
+  document.getElementById('cam-offline-msg').style.display = 'none';
+}
+
 function camLoaded() {
   camOk = true;
   document.getElementById('cam-offline-msg').style.display = 'none';
@@ -509,24 +339,26 @@ function retryCam() {
   const img = document.getElementById('cam-img');
   img.style.display = 'block';
   document.getElementById('cam-offline-msg').style.display = 'none';
-  img.src = 'http://172.20.10.3:5000/cam_stream?' + Date.now();
+  img.src = SERVER + '/cam_stream?' + Date.now();
 }
 
-// Check cam status every 10s
+// Check cam status every 10s — auto-retry if backend says online
 setInterval(async () => {
   try {
-    const res = await fetch(`${SERVER}/cam_status`);
+    const res  = await fetch(`${SERVER}/cam_status`);
     const data = await res.json();
     if (data.online && !camOk) retryCam();
+    if (!data.online && camOk) camError();
   } catch(e) {}
 }, 10000);
 
-// Initialize
+// ── Init ────────────────────────────────────────────────────
+startCam();
 loadWhitelist();
 loadBlacklist();
 loadSettings();
 loadRecentLog();
-setInterval(checkStatus, 3000)
+setInterval(checkStatus, 3000);
 setInterval(loadStats, 5000);
 
 function switchTab(tabName, btn) {
@@ -539,19 +371,15 @@ function switchTab(tabName, btn) {
 
 async function checkStatus() {
   try {
-    const res = await fetch(`${SERVER}/status`);
+    const res  = await fetch(`${SERVER}/status`);
     const data = await res.json();
-
-    const resultStrip  = document.getElementById('result-strip');
-    const waitingText  = document.getElementById('waiting-text');
-
+    const resultStrip = document.getElementById('result-strip');
+    const waitingText = document.getElementById('waiting-text');
     if (data.detected_plate && data.detected_plate.length > 2) {
       waitingText.style.display = 'none';
       resultStrip.classList.add('show');
-
       document.getElementById('plate-text').textContent = data.detected_plate;
       const statusEl = document.getElementById('plate-status');
-
       if (data.detection_result === 'ALLOWED') {
         resultStrip.className = 'result-strip show allowed';
         statusEl.className = 'plate-status status-allowed';
@@ -570,37 +398,38 @@ async function checkStatus() {
 
 async function loadStats() {
   try {
-    const res = await fetch(`${SERVER}/stats`);
+    const res  = await fetch(`${SERVER}/stats`);
     const data = await res.json();
-    document.getElementById('stat-total').textContent = data.total;
-    document.getElementById('stat-granted').textContent = data.whitelist;
-    document.getElementById('stat-denied').textContent = data.blacklist;
-    document.getElementById('stat-sensitivity').textContent = data.sensitivity + '%';
+    document.getElementById('stat-total').textContent       = data.total;
+    document.getElementById('stat-granted').textContent     = data.whitelist;
+    document.getElementById('stat-denied').textContent      = data.blacklist;
+    document.getElementById('stat-sensitivity').textContent = (data.sensitivity || 80) + '%';
   } catch(e) {}
 }
 
 async function loadWhitelist() {
   try {
-    const res = await fetch(`${SERVER}/whitelist`);
+    const res  = await fetch(`${SERVER}/whitelist`);
     const data = await res.json();
-    const html = data.map(item => `
-      <div class="list-item">
-        <div>
-          <div class="list-item-plate">${item.plate}</div>
-          <div class="list-item-info">${item.owner} - Added ${item.added_date}</div>
-        </div>
-        <button class="danger" style="padding:8px 16px;" onclick="removeWhitelist('${item.plate}')">Remove</button>
-      </div>`).join('');
-    document.getElementById('whitelist-list').innerHTML = html || '<p style="color:var(--text-muted);">No whitelisted vehicles</p>';
+    document.getElementById('whitelist-list').innerHTML = data.length
+      ? data.map(item => `
+          <div class="list-item">
+            <div>
+              <div class="list-item-plate">${item.plate}</div>
+              <div class="list-item-info">${item.owner} — Added ${item.added_date}</div>
+            </div>
+            <button class="danger" style="padding:8px 16px;" onclick="removeWhitelist('${item.plate}')">Remove</button>
+          </div>`).join('')
+      : '<p style="color:var(--text-muted);">No whitelisted vehicles</p>';
   } catch(e) {}
 }
 
 async function addWhitelist() {
-  const plate = document.getElementById('whitelist-plate').value;
-  const owner = document.getElementById('whitelist-owner').value;
-  if (!plate) { alert('Enter plate number'); return; }
+  const plate = document.getElementById('whitelist-plate').value.trim();
+  const owner = document.getElementById('whitelist-owner').value.trim();
+  if (!plate) { showNotification('Enter plate number', 'danger'); return; }
   try {
-    const res = await fetch(`${SERVER}/whitelist/add`, {
+    const res  = await fetch(`${SERVER}/whitelist/add`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ plate, owner })
     });
@@ -627,33 +456,34 @@ async function removeWhitelist(plate) {
 
 async function loadBlacklist() {
   try {
-    const res = await fetch(`${SERVER}/blacklist`);
+    const res  = await fetch(`${SERVER}/blacklist`);
     const data = await res.json();
-    const html = data.map(item => `
-      <div class="list-item">
-        <div>
-          <div class="list-item-plate">${item.plate}</div>
-          <div class="list-item-info">${item.reason} - Added ${item.added_date}</div>
-        </div>
-        <button class="danger" style="padding:8px 16px;" onclick="removeBlacklist('${item.plate}')">Remove</button>
-      </div>`).join('');
-    document.getElementById('blacklist-list').innerHTML = html || '<p style="color:var(--text-muted);">No blacklisted vehicles</p>';
+    document.getElementById('blacklist-list').innerHTML = data.length
+      ? data.map(item => `
+          <div class="list-item">
+            <div>
+              <div class="list-item-plate">${item.plate}</div>
+              <div class="list-item-info">${item.reason} — Added ${item.added_date}</div>
+            </div>
+            <button class="danger" style="padding:8px 16px;" onclick="removeBlacklist('${item.plate}')">Remove</button>
+          </div>`).join('')
+      : '<p style="color:var(--text-muted);">No blacklisted vehicles</p>';
   } catch(e) {}
 }
 
 async function addBlacklist() {
-  const plate = document.getElementById('blacklist-plate').value;
-  const reason = document.getElementById('blacklist-reason').value;
-  if (!plate) { alert('Enter plate number'); return; }
+  const plate  = document.getElementById('blacklist-plate').value.trim();
+  const reason = document.getElementById('blacklist-reason').value.trim();
+  if (!plate) { showNotification('Enter plate number', 'danger'); return; }
   try {
-    const res = await fetch(`${SERVER}/blacklist/add`, {
+    const res  = await fetch(`${SERVER}/blacklist/add`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ plate, reason })
     });
     const data = await res.json();
     if (data.status === 'added') {
       showNotification('✓ Added to blacklist', 'success');
-      document.getElementById('blacklist-plate').value = '';
+      document.getElementById('blacklist-plate').value  = '';
       document.getElementById('blacklist-reason').value = '';
       loadBlacklist();
     } else { showNotification('Already blacklisted', 'danger'); }
@@ -673,21 +503,21 @@ async function removeBlacklist(plate) {
 
 async function loadSettings() {
   try {
-    const res = await fetch(`${SERVER}/settings`);
+    const res  = await fetch(`${SERVER}/settings`);
     const data = await res.json();
-    document.getElementById('sensitivity').value = data.sensitivity;
-    document.getElementById('sensitivity-value').textContent = data.sensitivity + '%';
-    document.getElementById('gate-duration').value = data.gate_duration;
-    document.getElementById('auto-log').checked = data.auto_log;
-    document.getElementById('notifications').checked = data.notifications;
+    document.getElementById('sensitivity').value            = data.sensitivity;
+    document.getElementById('sensitivity-value').textContent= data.sensitivity + '%';
+    document.getElementById('gate-duration').value          = data.gate_duration;
+    document.getElementById('auto-log').checked             = data.auto_log;
+    document.getElementById('notifications').checked        = data.notifications;
   } catch(e) {}
 }
 
 async function saveSettings() {
   const settings = {
-    sensitivity: parseInt(document.getElementById('sensitivity').value),
+    sensitivity:   parseInt(document.getElementById('sensitivity').value),
     gate_duration: parseInt(document.getElementById('gate-duration').value),
-    auto_log: document.getElementById('auto-log').checked,
+    auto_log:      document.getElementById('auto-log').checked,
     notifications: document.getElementById('notifications').checked
   };
   try {
@@ -705,33 +535,33 @@ document.getElementById('sensitivity').addEventListener('input', function() {
 
 async function exportCSV() {
   try {
-    const res = await fetch(`${SERVER}/export/csv`);
+    const res  = await fetch(`${SERVER}/export/csv`);
     const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'detection_log.csv'; a.click();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url; a.download = 'detection_log.csv'; a.click();
     showNotification('✓ CSV exported', 'success');
   } catch(e) {}
 }
 
 async function exportJSON() {
   try {
-    const res = await fetch(`${SERVER}/export/json`);
+    const res  = await fetch(`${SERVER}/export/json`);
     const data = await res.json();
     const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'detection_log.json'; a.click();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url; a.download = 'detection_log.json'; a.click();
     showNotification('✓ JSON exported', 'success');
   } catch(e) {}
 }
 
 async function exportPDF() {
   try {
-    const res = await fetch(`${SERVER}/export/pdf`);
+    const res  = await fetch(`${SERVER}/export/pdf`);
     const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'detection_report.pdf'; a.click();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url; a.download = 'detection_report.pdf'; a.click();
     showNotification('✓ PDF exported', 'success');
-  } catch(e) { alert('PDF export requires reportlab: pip install reportlab'); }
+  } catch(e) { alert('PDF export requires: pip install reportlab'); }
 }
 
 async function clearLog() {
@@ -745,16 +575,17 @@ async function clearLog() {
 
 async function loadRecentLog() {
   try {
-    const res = await fetch(`${SERVER}/log?limit=20`);
+    const res  = await fetch(`${SERVER}/log?limit=20`);
     const data = await res.json();
-    const html = data.map(item => `
-      <div class="list-item">
-        <div>
-          <div class="list-item-plate">${item.plate}</div>
-          <div class="list-item-info">${item.timestamp} - ${item.status}</div>
-        </div>
-      </div>`).join('');
-    document.getElementById('recent-log').innerHTML = html || '<p style="color:var(--text-muted);">No detections yet</p>';
+    document.getElementById('recent-log').innerHTML = data.length
+      ? data.map(item => `
+          <div class="list-item">
+            <div>
+              <div class="list-item-plate">${item.plate}</div>
+              <div class="list-item-info">${item.timestamp} — ${item.status} — conf: ${item.confidence}</div>
+            </div>
+          </div>`).join('')
+      : '<p style="color:var(--text-muted);">No detections yet</p>';
   } catch(e) {}
 }
 
@@ -772,7 +603,7 @@ async function uploadImage() {
   const form = new FormData();
   form.append('image', file);
   try {
-    const res = await fetch(`${SERVER}/upload`, { method:'POST', body: form });
+    const res  = await fetch(`${SERVER}/upload`, { method:'POST', body: form });
     const data = await res.json();
     const result = document.getElementById('uploadResult');
     if (data.plate && data.plate.length > 2) {
@@ -780,8 +611,8 @@ async function uploadImage() {
         <div style="padding:20px;background:rgba(0,255,136,0.1);border:2px solid var(--success);border-radius:12px;margin-top:20px;">
           <p style="color:var(--success);font-weight:600;margin-bottom:10px;">✓ Plate Detected!</p>
           <p style="color:var(--accent-primary);font-size:24px;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:10px;">${data.plate}</p>
-          <p style="color:var(--text-muted);margin-bottom:10px;">Status: ${data.status}</p>
-          ${data.image ? `<img src="/static/uploads/${data.image}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:15px;border:2px solid var(--border-accent);">` : ''}
+          <p style="color:var(--text-muted);margin-bottom:10px;">Status: ${data.access || data.status}</p>
+          ${data.image ? `<img src="${SERVER}/static/uploads/${data.image}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:15px;border:2px solid var(--border-accent);">` : ''}
         </div>`;
       showNotification(`✓ Test Plate: ${data.plate}`, 'success');
     } else {

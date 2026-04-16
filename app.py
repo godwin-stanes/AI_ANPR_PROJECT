@@ -34,12 +34,12 @@ CORS(app)
 #  CONFIGURATION
 # ============================================================
 
-DROIDCAM_IP   = "192.168.137.126"   # ← your phone IP
+DROIDCAM_IP   = "192.168.137.151"    # ← your phone IP
 DROIDCAM_PORT = 4747
 # Flask tries /mjpegfeed first, falls back to /video
 DROIDCAM_URLS = [
-    f"http://{DROIDCAM_IP}:{DROIDCAM_PORT}/mjpegfeed",
-    f"http://{DROIDCAM_IP}:{DROIDCAM_PORT}/video",
+    f"http://{DROIDCAM_IP}:{DROIDCAM_PORT}/video",       # works on most Android DroidCam
+    f"http://{DROIDCAM_IP}:{DROIDCAM_PORT}/mjpegfeed",   # fallback
 ]
 
 os.makedirs('static/uploads', exist_ok=True)
@@ -169,14 +169,32 @@ def format_plate(c: str, ptype: str) -> str:
     return c
 
 def validate_plate(raw: str):
-    """Returns (is_valid, formatted, plate_type)"""
+    """
+    Returns (is_valid, formatted, plate_type).
+    Uses re.search so noise characters around the plate don't block a match.
+    """
     corrected = fix_ocr(raw)
+
+    # Try exact match first
     for pat, ptype in PLATE_PATTERNS:
         if re.match(pat, corrected):
             state = corrected[:2]
             if ptype in ("BH Series","Army/Defence","Diplomatic") \
                or state in INDIAN_STATE_CODES:
                 return True, format_plate(corrected, ptype), ptype
+
+    # Try substring search — catches noise chars OCR adds around the plate
+    for pat, ptype in PLATE_PATTERNS:
+        # Remove anchors for search
+        search_pat = pat.lstrip('^').rstrip('$')
+        m = re.search(search_pat, corrected)
+        if m:
+            matched = m.group()
+            state   = matched[:2]
+            if ptype in ("BH Series","Army/Defence","Diplomatic") \
+               or state in INDIAN_STATE_CODES:
+                return True, format_plate(matched, ptype), ptype
+
     return False, corrected, "Unknown"
 
 # ============================================================
@@ -217,26 +235,42 @@ def ocr_plate(roi: np.ndarray):
 # ============================================================
 
 def find_plate_regions(frame: np.ndarray) -> list:
+    fh, fw = frame.shape[:2]
+
+    # Scale limits relative to frame size so it works at any resolution
+    # Indian plate aspect ratio: ~4.5:1 (long) to ~2:1 (square embossed)
+    min_w = int(fw * 0.08)    # plate must be at least 8% of frame width
+    max_w = int(fw * 0.80)    # plate won't be wider than 80% of frame
+    min_h = int(fh * 0.02)    # plate must be at least 2% of frame height
+    max_h = int(fh * 0.25)    # plate won't be taller than 25% of frame
+
     gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur  = cv2.bilateralFilter(gray, 11, 15, 15)
     edges = cv2.Canny(blur, 30, 180)
     boxes = []
 
+    def is_plate_shape(w, h):
+        if h == 0: return False
+        aspect = w / h
+        return 1.5 < aspect < 7.0 and min_w < w < max_w and min_h < h < max_h
+
+    # Pass 1: 4-corner contours
     cnts, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    for cnt in sorted(cnts, key=cv2.contourArea, reverse=True)[:25]:
+    for cnt in sorted(cnts, key=cv2.contourArea, reverse=True)[:30]:
         peri   = cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, 0.016*peri, True)
         if len(approx) == 4:
             x, y, w, h = cv2.boundingRect(approx)
-            if h > 0 and 1.8 < (w/h) < 6.5 and 70 < w < 620 and 18 < h < 200:
+            if is_plate_shape(w, h):
                 boxes.append((x, y, w, h))
 
+    # Pass 2: morphological close (catches faint-bordered plates)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 5))
     closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
     cnts2, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in cnts2:
         x, y, w, h = cv2.boundingRect(cnt)
-        if h > 0 and 1.8 < (w/h) < 6.5 and 70 < w < 620 and 18 < h < 200:
+        if is_plate_shape(w, h):
             boxes.append((x, y, w, h))
 
     return boxes
@@ -267,7 +301,10 @@ class DroidCamStream(threading.Thread):
             connected = False
             for url in self.urls:
                 print(f"  DroidCam: trying {url} ...")
-                cap = cv2.VideoCapture(url)
+                # cv2.CAP_FFMPEG forces the FFMPEG backend
+                # Without this, OpenCV on Windows tries to treat the URL
+                # as a file path and throws a CAP_IMAGES error
+                cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 if not cap.isOpened():
                     cap.release()
@@ -297,8 +334,10 @@ class DroidCamStream(threading.Thread):
                         self._frame = frame
 
                 cap.release()
+                # Only mark disconnected AFTER releasing — not during read failures
                 with self._lock:
-                    self._connected = False
+                    self._connected  = False
+                    self._active_url = None
                 break   # retry from first URL
 
             if not connected:
@@ -336,36 +375,93 @@ def run_anpr_on_frame(img: np.ndarray):
     Runs full ANPR pipeline on a single frame.
     Returns dict: { plate, plate_type, status, result, confidence, filename }
     """
-    # ── Find plate regions ────────────────────────────────────
+    print(f"  [ANPR] Frame size: {img.shape[1]}x{img.shape[0]}")
+
+    # ── Step 1: Find plate regions via contour detection ─────
     regions = find_plate_regions(img)
+    print(f"  [ANPR] Plate regions found: {len(regions)}")
 
     best_plate, best_type, best_conf = None, "Unknown", 0.0
 
-    for (x, y, w, h) in regions:
+    for i, (x, y, w, h) in enumerate(regions):
         pad = 5
         roi = img[max(0,y-pad):min(img.shape[0],y+h+pad),
                   max(0,x-pad):min(img.shape[1],x+w+pad)]
         if roi.size == 0:
             continue
         text, conf = ocr_plate(roi)
+        print(f"  [ANPR] Region {i}: raw_ocr='{text}'  conf={conf:.2f}")
         if not text:
             continue
         is_valid, formatted, ptype = validate_plate(text)
+        print(f"  [ANPR] Region {i}: validated='{formatted}'  valid={is_valid}  type={ptype}")
         if is_valid and conf > best_conf:
             best_plate, best_type, best_conf = formatted, ptype, conf
 
-    # ── Fallback: raw EasyOCR on whole frame ─────────────────
-    # (catches plates that didn't pass contour detection)
+    # ── Step 2: Fallback — OCR on whole frame ────────────────
     if not best_plate:
-        raw_hits = reader.readtext(img,
-                                   allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
-                                   detail=1, paragraph=False)
+        print("  [ANPR] No plate from regions — running fallback OCR...")
+
+        # Resize to 1280px wide — EasyOCR works best at this resolution
+        fh, fw = img.shape[:2]
+        ocr_scale = min(1.0, 1280 / fw)
+        ocr_img   = cv2.resize(img, (int(fw*ocr_scale), int(fh*ocr_scale)),
+                               interpolation=cv2.INTER_AREA) if ocr_scale < 1.0 else img
+
+        # Full frame scan
+        raw_hits = reader.readtext(
+            ocr_img,
+            allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            detail=1, paragraph=False,
+        )
+        print(f"  [ANPR] Full-frame OCR hits: {len(raw_hits)}")
         for (_, txt, conf) in raw_hits:
+            print(f"         raw='{txt}'  conf={conf:.2f}")
             is_valid, formatted, ptype = validate_plate(txt)
             if is_valid and conf > best_conf:
                 best_plate, best_type, best_conf = formatted, ptype, conf
 
-    if not best_plate or best_conf < 0.30:
+        # Scan bottom-third strip (plate is usually at bumper level)
+        if not best_plate:
+            print("  [ANPR] Scanning bottom-third strip...")
+            strip = ocr_img[int(ocr_img.shape[0]*0.55):, :]
+            strip_hits = reader.readtext(
+                strip,
+                allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                detail=1, paragraph=False,
+            )
+            print(f"  [ANPR] Strip OCR hits: {len(strip_hits)}")
+            for (_, txt, conf) in strip_hits:
+                print(f"         raw='{txt}'  conf={conf:.2f}")
+                is_valid, formatted, ptype = validate_plate(txt)
+                if is_valid and conf > best_conf:
+                    best_plate, best_type, best_conf = formatted, ptype, conf
+
+        # CLAHE-enhanced scan as last resort
+        if not best_plate:
+            print("  [ANPR] Trying CLAHE-enhanced full frame...")
+            gray     = cv2.cvtColor(ocr_img, cv2.COLOR_BGR2GRAY)
+            clahe    = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(gray)
+            raw_hits2 = reader.readtext(
+                enhanced,
+                allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                detail=1, paragraph=False,
+            )
+            print(f"  [ANPR] Enhanced OCR hits: {len(raw_hits2)}")
+            for (_, txt, conf) in raw_hits2:
+                print(f"         raw='{txt}'  conf={conf:.2f}")
+                is_valid, formatted, ptype = validate_plate(txt)
+                if is_valid and conf > best_conf:
+                    best_plate, best_type, best_conf = formatted, ptype, conf
+
+    print(f"  [ANPR] Final result: plate='{best_plate}'  conf={best_conf:.2f}  type={best_type}")
+
+    if not best_plate or best_conf < 0.20:   # lowered from 0.25 — OCR on real plates often scores ~0.3
+        fail_path = f"static/uploads/fail_{int(time.time())}.jpg"
+        cv2.imwrite(fail_path, img)
+        print(f"  [ANPR] No plate detected — frame saved: {fail_path}")
+        print(f"  [ANPR] TIP: open {fail_path} — check if plate is visible and in focus")
         return {"plate": None, "result": "DENY", "status": "NO_PLATE",
                 "confidence": 0, "plate_type": "Unknown", "filename": None}
 
@@ -437,6 +533,8 @@ def run_anpr_on_frame(img: np.ndarray):
 
 detection_result  = "WAITING"   # WAITING / PROCESSING / ALLOWED / DENIED
 detected_plate    = ""
+detected_type     = ""
+last_image        = ""          # filename of last saved car photo
 detection_lock    = threading.Lock()
 
 # ============================================================
@@ -464,7 +562,9 @@ def ir_trigger():
     print(f"{'='*52}")
 
     # ── Step 1: Get latest frame from persistent stream ──────
-    # No connect/disconnect — frame is already in memory
+    # Wait 600ms so camera auto-exposure settles after the vehicle arrives
+    print("  Waiting 600ms for camera exposure to settle...")
+    time.sleep(0.6)
     img = droidcam.get_frame()
 
     if img is None:
@@ -474,11 +574,22 @@ def ir_trigger():
         return jsonify({"status": "ok", "result": "DENY",
                         "reason": "DroidCam not ready"}), 200
 
+    print(f"  Frame grabbed: {img.shape[1]}x{img.shape[0]}")
+
+    # Save raw frame so you can see exactly what camera captured
+    raw_name = f"raw_{int(time.time())}.jpg"
+    raw_path = f"static/uploads/{raw_name}"
+    cv2.imwrite(raw_path, img)
+    print(f"  RAW FRAME SAVED -> http://10.50.255.198:5000/static/uploads/{raw_name}")
+    print(f"  Open that URL in browser to see what camera saw!")
+
     # ── Step 2: Run ANPR ─────────────────────────────────────
     anpr = run_anpr_on_frame(img)
 
     with detection_lock:
         detected_plate   = anpr["plate"] or ""
+        detected_type    = anpr["plate_type"] or ""
+        last_image       = anpr["filename"] or ""
         detection_result = "ALLOWED" if anpr["result"] == "ALLOW" else "DENIED"
 
     return jsonify({
@@ -507,6 +618,8 @@ def status():
         return jsonify({
             "detection_result": detection_result,
             "detected_plate":   detected_plate,
+            "plate_type":       detected_type,
+            "last_image":       last_image,
         }), 200
 
 # ──────────────────────────────────────────────────────────
@@ -544,11 +657,75 @@ def cam_snapshot():
 
 @app.route("/cam_status")
 def cam_status():
+    frame     = droidcam.get_frame()
+    has_frame = frame is not None
+    is_online = droidcam.connected and has_frame
+
+    print(f"  [cam_status] connected={droidcam.connected}  has_frame={has_frame}  online={is_online}")
+
     return jsonify({
-        "online":     droidcam.connected,
+        # ── Status fields (all formats) ─────────────
+        "online":     is_online,                          # frontend checks this
+        "status":     "ok" if is_online else "offline",   # old compat
+        "source":     "droidcam",
         "ip":         DROIDCAM_IP,
         "active_url": droidcam._active_url,
+        "cam_data":   {"status": "ok", "ip": DROIDCAM_IP} if is_online else None,
     }), 200
+
+# ── Debug page — open in browser to verify everything works ──
+# http://YOUR_PC_IP:5000/cam_test
+@app.route("/cam_test")
+def cam_test():
+    frame     = droidcam.get_frame()
+    has_frame = frame is not None
+    connected = droidcam.connected
+
+    # Encode snapshot as base64 for inline display
+    img_tag = ""
+    if has_frame:
+        ret, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if ret:
+            import base64
+            b64 = base64.b64encode(buf.tobytes()).decode()
+            img_tag = f'<img src="data:image/jpeg;base64,{b64}" style="max-width:100%;border:3px solid #0f0;border-radius:8px;">'
+
+    color   = "#00ff88" if (connected and has_frame) else "#ff4444"
+    status  = "ONLINE" if (connected and has_frame) else "OFFLINE"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <title>DroidCam Test</title>
+  <style>
+    body {{ background:#111; color:#eee; font-family:monospace;
+            text-align:center; padding:30px; }}
+    h1   {{ color:{color}; }}
+    .box {{ display:inline-block; padding:12px 24px; border:2px solid {color};
+            border-radius:8px; margin:8px; color:{color}; font-size:14px; }}
+    img  {{ margin-top:20px; display:block; margin-left:auto; margin-right:auto; }}
+  </style>
+  <meta http-equiv="refresh" content="3">
+</head>
+<body>
+  <h1>DroidCam Status: {status}</h1>
+  <div class="box">Thread connected: {connected}</div>
+  <div class="box">Frame in buffer: {has_frame}</div>
+  <div class="box">IP: {DROIDCAM_IP}:{DROIDCAM_PORT}</div>
+  <div class="box">URL: {droidcam._active_url}</div>
+  <br>
+  {'<p style="color:#0f0">Live snapshot (refreshes every 3s):</p>' + img_tag if has_frame
+   else '<p style="color:#f44">No frame yet — check DroidCam app is open on phone</p>'}
+  <br><br>
+  <a href="/cam_stream" style="color:#0af">Open live stream →</a>
+</body>
+</html>"""
+    return html
+
+# Legacy alias — old frontend may call /esp32_cam_status
+@app.route("/esp32_cam_status")
+def esp32_cam_status():
+    return cam_status()
 
 # ──────────────────────────────────────────────────────────
 #  MANUAL UPLOAD (frontend drag-and-drop)
@@ -731,12 +908,14 @@ def update_settings():
 
 @app.route("/stats", methods=["GET"])
 def get_stats():
-    rows = read_csv(LOG_FILE)
+    rows     = read_csv(LOG_FILE)
+    settings = get_settings()
     return jsonify({
-        "total":     len(rows),
-        "whitelist": sum(1 for r in rows if r.get('status') == 'WHITELIST'),
-        "blacklist": sum(1 for r in rows if r.get('status') == 'BLACKLIST'),
-        "unknown":   sum(1 for r in rows if r.get('status') == 'UNKNOWN'),
+        "total":       len(rows),
+        "whitelist":   sum(1 for r in rows if r.get('status') == 'WHITELIST'),
+        "blacklist":   sum(1 for r in rows if r.get('status') == 'BLACKLIST'),
+        "unknown":     sum(1 for r in rows if r.get('status') == 'UNKNOWN'),
+        "sensitivity": settings.get("sensitivity", 80),
     }), 200
 
 # ============================================================
