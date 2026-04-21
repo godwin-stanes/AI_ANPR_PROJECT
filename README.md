@@ -49,7 +49,7 @@
 
 | Metric | Result |
 |--------|--------|
-| **Vehicles Processed** | 1,000+ |
+| **Vehicles Processed** | 50+ |
 | **OCR Success Rate** | 95.2% |
 | **Processing Time** | 3-4 seconds |
 | **System Uptime** | 99.5% (14+ days) |
